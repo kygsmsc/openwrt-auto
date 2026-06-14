@@ -26,6 +26,7 @@ on:
           - immortalwrt-24.10
           - istoreos-master
           - kygs-immortalwrt-master
+          - kygs-immortalwrt-24.10
           
       version_tag:
         description: "选择源码版本 Tag（ latest = 最新代码）"
