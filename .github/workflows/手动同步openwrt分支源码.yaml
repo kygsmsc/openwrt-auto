@@ -11,12 +11,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # 开启凭证，或者手动注入token，二选一，这里保留false手动配置更稳定
           persist-credentials: false
 
-      - name: 配置Git身份
+      - name: 配置Git身份与鉴权
         run: |
           git config --global user.name "kygsmsc"
           git config --global user.email "kygs1@163.com"
+          # 配置https自动带上token，解决github账号密码读取失败
+          git config --global credential.helper '!f() { echo "username=${{ github.actor }}"; echo "password=${{ secrets.GITHUB_TOKEN }}"; }; f'
 
       - name: 添加上游仓库
         run: git remote add upstream https://github.com/immortalwrt/immortalwrt.git
@@ -24,8 +27,9 @@ jobs:
       - name: 拉取上游全部分支与标签
         run: git fetch upstream --tags
 
-      - name: 合并上游代码（不强制覆盖本地修改）
+      - name: 合并上游代码并推送
         run: |
-          git checkout openwrt-24.10
+          # 如果本地不存在该分支则新建，存在则切换
+          git checkout -B openwrt-24.10 upstream/openwrt-24.10
           git merge upstream/openwrt-24.10
           git push origin openwrt-24.10
