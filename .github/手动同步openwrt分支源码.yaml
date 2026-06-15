@@ -1,0 +1,31 @@
+name: 手动同步openwrt-24.10源码
+run-name: 同步24.10分支
+on:
+  workflow_dispatch:
+
+jobs:
+  sync-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 配置Git身份
+        run: |
+          git config --global user.name "kygsmsc"
+          git config --global user.email "kygs1@163.com"
+
+      - name: 添加上游仓库
+        run: git remote add upstream https://github.com/immortalwrt/immortalwrt.git
+
+      - name: 拉取上游全部分支与标签
+        run: git fetch upstream --tags
+
+      - name: 合并上游代码（不强制覆盖本地修改）
+        run: |
+          git checkout openwrt-24.10
+          git merge upstream/openwrt-24.10
+          git push origin openwrt-24.10
