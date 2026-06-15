@@ -1,0 +1,118 @@
+name: 通用openwrt源码同步工具
+run-name: 同步 ${{ github.event.inputs.source_repo }} 分支 ${{ github.event.inputs.target_ver }}
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        type: choice
+        description: 选择上游源码主线
+        options:
+          - lede-master
+          - openwrt-main
+          - immortalwrt-master
+          - istoreos-master
+        default: immortalwrt-master
+      target_ver:
+        type: choice
+        description: 选择要同步的版本分支
+        options:
+          - master
+          - main
+          - 23.10
+          - 24.10
+          - 25.12
+        default: 24.10
+
+jobs:
+  sync-branch:
+    runs-on: ubuntu-latest
+    env:
+      # 输入参数赋值
+      SOURCE_KEY: ${{ github.event.inputs.source_repo }}
+      TARGET_VER: ${{ github.event.inputs.target_ver }}
+      # 映射上游仓库地址 & 个人目标仓库名
+      UPSTREAM_LED_MASTER: https://github.com/coolsnowwolf/lede.git
+      UPSTREAM_OPENWRT_MAIN: https://github.com/openwrt/openwrt.git
+      UPSTREAM_IMM_MASTER: https://github.com/immortalwrt/immortalwrt.git
+      UPSTREAM_ISTORE_MASTER: https://github.com/istoreos/istoreos.git
+    steps:
+      - name: 检出当前工作流仓库 openwrt-auto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 1. 根据选择自动解析上游地址、目标仓库名
+      - name: 解析上游仓库与目标仓库名称
+        id: parse_env
+        run: |
+          # 初始化变量
+          UPSTREAM_URL=""
+          TARGET_REPO_NAME=""
+          BRANCH_PREFIX=""
+          case $SOURCE_KEY in
+            lede-master)
+              UPSTREAM_URL=${{ env.UPSTREAM_LED_MASTER }}
+              TARGET_REPO_NAME="lede"
+              BRANCH_PREFIX=""
+              ;;
+            openwrt-main)
+              UPSTREAM_URL=${{ env.UPSTREAM_OPENWRT_MAIN }}
+              TARGET_REPO_NAME="openwrt"
+              BRANCH_PREFIX="openwrt-"
+              ;;
+            immortalwrt-master)
+              UPSTREAM_URL=${{ env.UPSTREAM_IMM_MASTER }}
+              TARGET_REPO_NAME="immortalwrt"
+              BRANCH_PREFIX="openwrt-"
+              ;;
+            istoreos-master)
+              UPSTREAM_URL=${{ env.UPSTREAM_ISTORE_MASTER }}
+              TARGET_REPO_NAME="istoreos"
+              BRANCH_PREFIX=""
+              ;;
+          esac
+          # 拼接最终上游分支名
+          if [[ "$TARGET_VER" == "master" || "$TARGET_VER" == "main" ]]; then
+            UPSTREAM_BRANCH="$TARGET_VER"
+          else
+            UPSTREAM_BRANCH="${BRANCH_PREFIX}${TARGET_VER}"
+          fi
+          # 输出变量供后续步骤使用
+          echo "UPSTREAM_URL=$UPSTREAM_URL" >> $GITHUB_ENV
+          echo "TARGET_REPO_NAME=$TARGET_REPO_NAME" >> $GITHUB_ENV
+          echo "UPSTREAM_BRANCH=$UPSTREAM_BRANCH" >> $GITHUB_ENV
+          echo "LOCAL_BRANCH=$UPSTREAM_BRANCH" >> $GITHUB_ENV
+          echo "目标仓库: kygsmsc/$TARGET_REPO_NAME"
+          echo "上游地址: $UPSTREAM_URL"
+          echo "同步分支: $UPSTREAM_BRANCH"
+
+      # 2. 克隆你的个人目标仓库 kygsmsc/xxx
+      - name: 克隆个人目标仓库
+        run: |
+          git clone https://${{ secrets.PUSH_TOKEN }}@github.com/kygsmsc/${{ env.TARGET_REPO_NAME }}.git target-repo
+          cd target-repo
+
+      # 3. 全局Git身份+鉴权配置
+      - name: 配置Git用户与跨仓库推送凭证
+        run: |
+          cd target-repo
+          git config user.name "kygsmsc"
+          git config user.email "kygs1@163.com"
+          git config --global credential.helper '!f() { echo "username=kygsmsc"; echo "password=${{ secrets.PUSH_TOKEN }}"; }; f'
+
+      # 4. 添加上游源并拉取全部分支标签
+      - name: 添加上游官方源并拉取代码
+        run: |
+          cd target-repo
+          git remote remove upstream || true
+          git remote add upstream ${{ env.UPSTREAM_URL }}
+          git fetch upstream --tags
+
+      # 5. 切换/新建分支、合并上游、推送至个人仓库
+      - name: 同步上游分支并推送到个人仓库
+        run: |
+          cd target-repo
+          # -B 分支存在则重置，不存在新建
+          git checkout -B ${{ env.LOCAL_BRANCH }} upstream/${{ env.UPSTREAM_BRANCH }}
+          git merge upstream/${{ env.UPSTREAM_BRANCH }}
+          git push origin ${{ env.LOCAL_BRANCH }}
