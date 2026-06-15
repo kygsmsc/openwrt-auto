@@ -220,15 +220,14 @@ jobs:
     - name: 加载自定义配置
       run: |
         [ -e files ] && cp -rf files openwrt/
-        if [ -f ".config" ]; then
-        cp -f .config openwrt/.config
-        echo "✅ 成功将仓库根目录的 .config 复制到 openwrt/.config"
-        elif [ -f "config.seed" ]; then
-        cp -f config.seed openwrt/.config
-        echo "✅ 使用 config.seed 作为配置文件"
+        CFG_FILE="${{ github.event.inputs.config_save_path }}"
+        if [ -f "${CFG_FILE}" ]; then
+        cp -f "${CFG_FILE}" openwrt/.config
+        echo "✅ 成功将仓库根目录 ${CFG_FILE} 复制到 openwrt/.config"
         else
-        echo "⚠️ 未找到自定义配置文件，使用默认配置"
+        echo "⚠️ 未找到配置文件 ${CFG_FILE}，使用源码默认配置"
         fi
+
 
     - name: 执行自定义脚本2
       run: |
