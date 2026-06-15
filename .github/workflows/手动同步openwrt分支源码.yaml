@@ -7,29 +7,40 @@ jobs:
   sync-branch:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出仓库代码
+      # 1. 检出当前工作流仓库代码（openwrt-auto，仅作运行环境）
+      - name: 检出当前仓库
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # 开启凭证，或者手动注入token，二选一，这里保留false手动配置更稳定
-          persist-credentials: false
 
-      - name: 配置Git身份与鉴权
+      # 2. 克隆你的目标仓库 kygsmsc/immortalwrt
+      - name: 克隆目标仓库 immortalwrt
         run: |
-          git config --global user.name "kygsmsc"
-          git config --global user.email "kygs1@163.com"
-          # 配置https自动带上token，解决github账号密码读取失败
-          git config --global credential.helper '!f() { echo "username=${{ github.actor }}"; echo "password=${{ secrets.GITHUB_TOKEN }}"; }; f'
+          git clone https://${{ secrets.PUSH_TOKEN }}@github.com/kygsmsc/immortalwrt.git target-repo
+          cd target-repo
 
-      - name: 添加上游仓库
-        run: git remote add upstream https://github.com/immortalwrt/immortalwrt.git
-
-      - name: 拉取上游全部分支与标签
-        run: git fetch upstream --tags
-
-      - name: 合并上游代码并推送
+      # 3. 进入目标仓库目录，配置git用户
+      - name: 配置Git身份
         run: |
-          # 如果本地不存在该分支则新建，存在则切换
+          cd target-repo
+          git config user.name "kygsmsc"
+          git config user.email "kygs1@163.com"
+          # 全局凭证，推送使用个人token
+          git config --global credential.helper '!f() { echo "username=kygsmsc"; echo "password=${{ secrets.PUSH_TOKEN }}"; }; f'
+
+      # 4. 添加上游官方 ImmortalWrt 源
+      - name: 添加上游仓库并拉取代码
+        run: |
+          cd target-repo
+          git remote add upstream https://github.com/immortalwrt/immortalwrt.git
+          git fetch upstream --tags
+
+      # 5. 切换/新建分支、合并上游代码、推送至你的immortalwrt仓库
+      - name: 同步上游分支并推送
+        run: |
+          cd target-repo
+          # -B 存在则重置，不存在新建分支
           git checkout -B openwrt-24.10 upstream/openwrt-24.10
           git merge upstream/openwrt-24.10
+          # 推送到自己的immortalwrt仓库origin
           git push origin openwrt-24.10
