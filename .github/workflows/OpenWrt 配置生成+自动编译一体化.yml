@@ -5,6 +5,7 @@
 # openwrt:一体化工作流
 # 功能:选择源码→加载自定义配置→生成配置→自动保存配置→编译固件→发布版本
 # 修复项：补充仓库写入权限、精简冗余命令、修复语法风险、优化日志、保留全部旧代码注释
+# 缓存优化：分离源码/缓存目录，修复hashFiles失效，消除git clone目录冲突，提升缓存命中率
 #============================================================================================
 name: OpenWrt 配置生成+自动编译一体化
 
@@ -73,6 +74,7 @@ env:
   TZ: Asia/Shanghai
   UPLOAD_RELEASE: true
   UPLOAD_FIRMWARE: true
+  UPLOAD_BIN_DIR: true
   CONFIG_CCACHE: y          # 开启 ccache 加速
   CCACHE_DIR: /builder/ccache
   # 区分Tag版本缓存，避免切换版本缓存错乱
@@ -94,7 +96,8 @@ jobs:
       run: |
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install build-essential ccache cmake flex bison gawk gcc-multilib g++-multilib libncurses5-dev python3 git wget curl zip unzip bzip2 p7zip-full rsync file gettext libssl-dev libelf-dev autopoint libtool-bin perl
-        sudo apt-get install python3.9
+        # ubuntu22.04自带python3.10，删除多余python3.9安装避免冲突
+        # sudo apt-get install python3.9
         # 【精简】删除无用 systemctl daemon-reload
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean && sudo -E apt-get -qq autoclean
@@ -148,18 +151,18 @@ jobs:
           exit 1
         fi
 
-    # ==================== 提速优化 2：编译缓存 ====================
+    # ==================== 提速优化 2：编译缓存（重构分离缓存目录，修复hash失效） ====================
     - name: 缓存 OpenWrt 编译文件
-      uses: actions/cache@v3
+      uses: actions/cache@v3.3.2
       with:
+        # 缓存全部放在/builder下独立目录，不再嵌套openwrt，不会自动生成openwrt文件夹
         path: |
-          /builder/openwrt/dl
-          /builder/openwrt/build_dir
-          /builder/openwrt/staging_dir
+          /builder/dl
+          /builder/build_dir
+          /builder/staging_dir
           /builder/ccache
-        # 原Key注释保留，新Key区分Tag防止缓存错乱
-        # key: openwrt-${{ github.event.inputs.source_repo }}-${{ hashFiles('openwrt/.config') }}
-        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ hashFiles('openwrt/.config') }}
+        # hashFiles读取仓库根目录.config，路径真实存在，配置变更自动换缓存key
+        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ hashFiles('.config') }}
         restore-keys: |
           openwrt-${{ github.event.inputs.source_repo }}-
 
@@ -167,9 +170,17 @@ jobs:
       id: clone_src
       working-directory: /builder
       run: |
+        # 每次彻底删除源码目录，杜绝目录冲突报错
+        rm -rf openwrt
         git clone -b ${{ steps.repo.outputs.REPO_BRANCH }} ${{ steps.repo.outputs.REPO_URL }} openwrt
         ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
         cd openwrt
+
+        # 创建独立缓存目录软链接，源码与缓存完全隔离
+        mkdir -p /builder/dl /builder/build_dir /builder/staging_dir
+        ln -sf /builder/dl dl
+        ln -sf /builder/build_dir build_dir
+        ln -sf /builder/staging_dir staging_dir
 
         # 【注释保留原有Tag切换旧代码】
         # if [ "${{ github.event.inputs.version_tag }}" != "latest" ]; then
@@ -247,7 +258,7 @@ jobs:
 
     - name: SSH 远程连接（可选）
       if: github.event.inputs.ssh == 'true'
-      uses: rdp-studio/ssh2actions@main
+      uses: rdp-studio/ssh2actions@v1
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -285,14 +296,15 @@ jobs:
           echo -e "\033[33m⚠️ 无配置变更，本次无需提交\033[0m"
         fi
 
-        if git push --force; then
+        # 移除危险的--force强制推送，避免覆盖远端
+        if git push; then
           echo -e "\033[32m✅ 配置文件已成功推送至远程仓库\033[0m"
         else
           echo -e "\033[31m❌ Git推送远程仓库失败\033[0m"
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+      continue-on-error: true
 
     # ==================== 下载编译依赖包 ====================
     - name: 下载编译依赖
@@ -305,6 +317,7 @@ jobs:
 
     # ==================== 编译固件 ====================
     - name: 开始编译固件
+      id: compile_firmware
       if: steps.clone_src.outputs.status == 'success'
       run: |
         cd openwrt
@@ -319,8 +332,8 @@ jobs:
       run: df -hT
 
     - name: 上传bin目录产物
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      uses: actions/upload-artifact@v4
+      if: steps.compile_firmware.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
@@ -335,7 +348,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: 上传固件目录
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -350,7 +363,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: 创建版本发布
-      uses: softprops/action-gh-release@master
+      uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -360,14 +373,14 @@ jobs:
         files: ${{ env.FIRMWARE }}/*
 
     - name: 清理历史工作流记录
-      uses: Mattraks/delete-workflow-runs@main
+      uses: Mattraks/delete-workflow-runs@v2
       with:
-        retain_days: 0
-        keep_minimum_runs: 2
+        retain_days: 7
+        keep_minimum_runs: 3
 
     - name: 删除旧版本Release
       if: github.event.inputs.delete_last_release == 'true' && env.UPLOAD_RELEASE == 'true' && !cancelled()
-      uses: dev-drprasad/delete-older-releases@master
+      uses: dev-drprasad/delete-older-releases@v0.3.0
       with:
         keep_latest: 1
         delete_tags: true
