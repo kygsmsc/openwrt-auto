@@ -31,7 +31,7 @@ on:
           - immortalwrt-24.10
           - istoreos-master
           - kygs-immortalwrt-master
-          - kygs-immortalwrt-24.10
+          - kygs-istoreos-24.10
           
       version_tag:
         description: "选择源码版本 Tag（ latest = 最新代码）"
@@ -136,8 +136,8 @@ jobs:
             REPO_URL="https://github.com/kygsmsc/immortalwrt"
             REPO_BRANCH="master" ;;
           kygs-immortalwrt-24.10)
-            REPO_URL="https://github.com/kygsmsc/immortalwrt"
-            REPO_BRANCH="openwrt-24.10" ;;
+            REPO_URL="https://github.com/kygsmsc/istoreos"
+            REPO_BRANCH="istoreos-24.10" ;;
           *)
             echo "::error::未定义仓库" && exit 1 ;;
         esac
