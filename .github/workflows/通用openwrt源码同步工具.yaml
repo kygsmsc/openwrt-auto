@@ -1,4 +1,4 @@
-name: 通用openwrt源码同步工具
+name: 通用源码同步工具
 run-name: 同步 ${{ github.event.inputs.source_repo }} 分支 ${{ github.event.inputs.target_ver }}
 on:
   workflow_dispatch:
@@ -13,14 +13,8 @@ on:
           - istoreos-master
         default: immortalwrt-master
       target_ver:
-        type: choice
-        description: 选择要同步的版本分支
-        options:
-          - master
-          - main
-          - 23.10
-          - 24.10
-          - 25.12
+        type: input
+        description: 手动输入需要同步的版本分支（示例：24.10、23.10、master、main）
         default: 24.10
 
 jobs:
