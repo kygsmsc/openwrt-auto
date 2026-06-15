@@ -135,7 +135,7 @@ jobs:
           kygs-immortalwrt-master)
             REPO_URL="https://github.com/kygsmsc/immortalwrt"
             REPO_BRANCH="master" ;;
-          kygs-immortalwrt-24.10)
+          kygs-istoreos-24.10)
             REPO_URL="https://github.com/kygsmsc/istoreos"
             REPO_BRANCH="istoreos-24.10" ;;
           *)
