@@ -66,6 +66,13 @@ on:
         default: "false"
         type: boolean
 
+      # ■ 新增缓存控制选项：解决切换分支/版本时缓存冲突问题
+      use_cache:
+        description: "是否使用编译缓存（关闭则每次全新编译，解决跨版本缓存冲突）"
+        required: false
+        default: "true"
+        type: boolean
+
 env:
   FEEDS_CONF: feeds.conf.default
   DIY_P1_SH: diy-part1.sh
@@ -153,7 +160,9 @@ jobs:
         fi
 
     # ==================== 提速优化 2：编译缓存（重构分离缓存目录，修复hash失效） ====================
+    # ■ 修改：添加缓存开关控制，解决跨版本缓存冲突问题
     - name: 缓存 OpenWrt 编译文件
+      if: github.event.inputs.use_cache == 'true'
       uses: actions/cache@v4
       # ★修改原因：v3.3.2已被官方标记废弃，更换v4稳定官方版本消除告警
       with:
@@ -167,6 +176,15 @@ jobs:
         key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ hashFiles('.config') }}
         restore-keys: |
           openwrt-${{ github.event.inputs.source_repo }}-
+
+    # ■ 新增：当不使用缓存时，清理可能存在的旧缓存目录
+    - name: 清理缓存目录（当禁用缓存时）
+      if: github.event.inputs.use_cache == 'false'
+      run: |
+        echo "■ 禁用缓存模式：清理可能存在的旧编译目录"
+        sudo rm -rf /builder/dl /builder/build_dir /builder/staging_dir /builder/ccache
+        sudo mkdir -p /builder/dl /builder/build_dir /builder/staging_dir /builder/ccache
+        sudo chown -R $USER:$GROUPS /builder
 
     - name: 克隆 OpenWrt 源码
       id: clone_src
