@@ -40,7 +40,7 @@ on:
         type: choice
         options:
           - latest
-          - v24.10.0
+          - openwrt-24.10
           - v24.10.1
           - v23.05.0
           - v23.05.1
