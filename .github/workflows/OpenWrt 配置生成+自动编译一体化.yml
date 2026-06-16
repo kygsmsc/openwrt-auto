@@ -34,7 +34,7 @@ on:
           - kygs-istoreos-24.10
           
       version_tag:
-        description: "选择源码版本 Tag（ latest = 最新代码）"
+        description: "选择源码版本 Tag（ latest = 最新代码；openwrt-24.10 为分支，其余v开头为版本标签）"
         required: true
         default: "latest"
         type: choice
@@ -190,20 +190,32 @@ jobs:
         #   git checkout ${{ github.event.inputs.version_tag }} 2>/dev/null || echo "使用分支最新代码"
         # fi
 
-        # 新版Tag切换逻辑：避免游离HEAD、增加强校验
-        TAG_INPUT="${{ github.event.inputs.version_tag }}"
-        if [[ "$TAG_INPUT" != "latest" ]]; then
-          echo "========== 开始拉取并切换至标签: $TAG_INPUT =========="
-          git fetch --tags
-          if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
-            echo "::error::标签 $TAG_INPUT 在当前源码中不存在！"
-            exit 1
-          fi
-          git checkout -b tag_build_$TAG_INPUT $TAG_INPUT
-          echo "✅ 已成功切换至标签 $TAG_INPUT，新建临时分支避免游离头指针"
-        else
-          echo "✅ 使用分支最新代码，不切换Tag"
-        fi
+       # ★修改原因：分三段逻辑处理，1.latest直接保留默认分支；2.v+数字开头为版本Tag校验；3.其余名称先校验是否存在远程Tag，存在切Tag，不存在则切远程分支，完全匹配下拉选项需求
+TAG_INPUT="${{ github.event.inputs.version_tag }}"
+if [[ "$TAG_INPUT" == "latest" ]]; then
+    echo "✅ 选择latest，使用克隆默认分支，不执行任何切换操作"
+elif [[ "$TAG_INPUT" =~ ^v[0-9] ]]; then
+    echo "========== 识别为版本标签 $TAG_INPUT，开始校验拉取 =========="
+    git fetch --tags
+    if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+        echo "::error::标签 $TAG_INPUT 在当前源码仓库不存在！"
+        exit 1
+    fi
+    git checkout -b tag_build_$TAG_INPUT $TAG_INPUT
+    echo "✅ 新建临时分支 tag_build_$TAG_INPUT 绑定标签，避免游离HEAD"
+else
+    echo "========== 非v开头参数，先校验是否为远程标签 $TAG_INPUT =========="
+    git fetch --tags
+    if git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+        echo "✅ 检测到存在同名Tag，切换标签 $TAG_INPUT"
+        git checkout -b tag_build_$TAG_INPUT $TAG_INPUT
+    else
+        echo "========== 无对应Tag，切换远程分支 $TAG_INPUT =========="
+        git fetch origin "$TAG_INPUT":"$TAG_INPUT"
+        git checkout "$TAG_INPUT"
+        echo "✅ 成功切换至远程分支 $TAG_INPUT"
+    fi
+fi
 
         echo "status=success" >> ${GITHUB_OUTPUT}
 
