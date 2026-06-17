@@ -1,0 +1,305 @@
+#==========================================================================================
+# OpenWrt CI · LTS Final
+# - 多设备并行
+# - 按 device 自动选择 .config.<device>
+# - 增量 / 全量智能编译
+# - ccache 独立缓存
+# - 编译报表 + 缓存命中率
+# - 失败自动保留 build_dir
+# - 自动清理过期 cache
+#==========================================================================================
+
+name: openwrt在线编译终极稳定版
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        description: "OpenWrt 源码仓库"
+        required: true
+        default: "kygs-immortalwrt-master"
+        type: choice
+        options:
+          - lede-master
+          - openwrt-main
+          - openwrt-24.10
+          - openwrt-23.05
+          - immortalwrt-master
+          - immortalwrt-24.10
+          - istoreos-master
+          - kygs-immortalwrt-master
+          - kygs-istoreos-24.10
+
+      version_tag:
+        description: "源码版本（latest = 分支 HEAD）"
+        required: true
+        default: "latest"
+        type: choice
+        options:
+          - latest
+          - openwrt-24.10
+          - v24.10.1
+          - v23.05.0
+          - v23.05.1
+          - v23.05.2
+          - v23.05.3
+          - v23.05.4
+
+      config_base:
+        description: "配置基础名（如 .config）"
+        required: true
+        default: ".config"
+        type: string
+
+      delete_last_release:
+        description: "删除上一个 Release"
+        required: false
+        default: false
+        type: boolean
+
+      use_cache:
+        description: "是否加载旧缓存（仍会保存本次）"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  TZ: Asia/Shanghai
+  CONFIG_CCACHE: y
+  CCACHE_DIR: /builder/ccache
+  VERSION_TAG: ${{ github.event.inputs.version_tag }}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        device:
+          - x86_64
+          - rpi-4
+          - nanopi-r2s
+
+    env:
+      DEVICE: ${{ matrix.device }}
+
+    steps:
+    # ========== 基础环境 ==========
+    - name: 记录开始时间
+      run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+    - name: 检出仓库
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: true
+
+    - name: 安装依赖
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -qq install build-essential ccache cmake flex bison gawk \
+          gcc-multilib g++-multilib libncurses5-dev python3 git wget curl zip unzip \
+          bzip2 p7zip-full rsync file gettext libssl-dev libelf-dev autopoint libtool-bin perl
+        sudo apt-get -qq autoremove -y
+        sudo apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /builder
+        sudo chown $USER:$GROUPS /builder
+        ccache -M 10G
+
+    # ========== 源码 ==========
+    - name: 解析源码仓库
+      id: repo
+      run: |
+        case "${{ github.event.inputs.source_repo }}" in
+          lede-master)
+            echo "REPO_URL=https://github.com/coolsnowwolf/lede" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=master" >> $GITHUB_OUTPUT ;;
+          openwrt-main)
+            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=main" >> $GITHUB_OUTPUT ;;
+          openwrt-24.10)
+            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=openwrt-24.10" >> $GITHUB_OUTPUT ;;
+          openwrt-23.05)
+            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=openwrt-23.05" >> $GITHUB_OUTPUT ;;
+          immortalwrt-master)
+            echo "REPO_URL=https://github.com/immortalwrt/immortalwrt" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=master" >> $GITHUB_OUTPUT ;;
+          immortalwrt-24.10)
+            echo "REPO_URL=https://github.com/immortalwrt/immortalwrt" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=openwrt-24.10" >> $GITHUB_OUTPUT ;;
+          istoreos-master)
+            echo "REPO_URL=https://github.com/istoreos/istoreos" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=main" >> $GITHUB_OUTPUT ;;
+          kygs-immortalwrt-master)
+            echo "REPO_URL=https://github.com/kygsmsc/immortalwrt" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=master" >> $GITHUB_OUTPUT ;;
+          kygs-istoreos-24.10)
+            echo "REPO_URL=https://github.com/kygsmsc/istoreos" >> $GITHUB_OUTPUT
+            echo "REPO_BRANCH=istoreos-24.10" >> $GITHUB_OUTPUT ;;
+        esac
+
+    - name: 克隆源码
+      working-directory: /builder
+      run: |
+        rm -rf openwrt
+        git clone -b ${{ steps.repo.outputs.REPO_BRANCH }} \
+          ${{ steps.repo.outputs.REPO_URL }} openwrt
+        ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
+
+    # ========== 配置 ==========
+    - name: 加载设备配置
+      id: load_config
+      run: |
+        BASE="${{ github.event.inputs.config_base }}"
+        DEVICE_CFG="${BASE}.${DEVICE}"
+
+        if [ -f "$DEVICE_CFG" ]; then
+          cp "$DEVICE_CFG" openwrt/.config
+          echo "CONFIG_TYPE=device" >> $GITHUB_OUTPUT
+        elif [ -f "$BASE" ]; then
+          cp "$BASE" openwrt/.config
+          echo "CONFIG_TYPE=default" >> $GITHUB_OUTPUT
+        else
+          echo "::error::未找到配置文件"
+          exit 1
+        fi
+
+    - name: 生成 .config
+      id: defconfig
+      run: |
+        cd openwrt
+        make defconfig
+        CONFIG_HASH=$(sha256sum .config | cut -d' ' -f1)
+        echo "CONFIG_HASH=$CONFIG_HASH" >> $GITHUB_OUTPUT
+        echo "FILE_DATE=$(date +%Y%m%d%H%M)" >> $GITHUB_ENV
+
+    # ========== 缓存 ==========
+    - name: 缓存构建目录
+      uses: actions/cache@v4
+      with:
+        path: |
+          /builder/dl
+          /builder/build_dir
+          /builder/staging_dir
+        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-${{ steps.defconfig.outputs.CONFIG_HASH }}
+        restore-keys: |
+          openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-
+        lookup-only: ${{ github.event.inputs.use_cache != 'true' }}
+
+    - name: 缓存 ccache
+      uses: actions/cache@v4
+      with:
+        path: /builder/ccache
+        key: ccache-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-${{ steps.defconfig.outputs.CONFIG_HASH }}
+        restore-keys: |
+          ccache-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-
+        lookup-only: ${{ github.event.inputs.use_cache != 'true' }}
+
+    - name: 显示缓存状态
+      run: |
+        [ -d /builder/build_dir ] && echo "✅ Build cache HIT" || echo "❌ Build cache MISS"
+        [ -d /builder/ccache ] && echo "✅ ccache HIT" || echo "❌ ccache MISS"
+
+    # ========== Feeds / 编译准备 ==========
+    - name: Feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 判断编译模式
+      id: build_mode
+      run: |
+        if git diff --name-only HEAD~1 | grep -E 'feeds|package'; then
+          echo "FORCE_FULLBUILD=true" >> $GITHUB_OUTPUT
+        else
+          echo "FORCE_FULLBUILD=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: 编译
+      id: compile
+      run: |
+        cd openwrt
+        if [ "${{ steps.build_mode.outputs.FORCE_FULLBUILD }}" = "true" ]; then
+          make -j$(nproc) V=w
+        else
+          make target/compile -j$(nproc) V=w
+          make package/compile -j$(nproc) V=w
+          make package/index
+        fi
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    # ========== 失败调试 ==========
+    - name: 失败时上传 build_dir
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: debug-build_dir-${{ matrix.device }}
+        path: /builder/build_dir
+        retention-days: 3
+
+    # ========== 报表 ==========
+    - name: 编译统计
+      if: always()
+      id: stats
+      run: |
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        MIN=$((DURATION / 60))
+        SEC=$((DURATION % 60))
+
+        echo "DURATION_MIN=$MIN" >> $GITHUB_OUTPUT
+        echo "DURATION_SEC=$SEC" >> $GITHUB_OUTPUT
+        echo "BUILD_CACHE_HIT=$( [ -d /builder/build_dir ] && echo '✅' || echo '❌' )" >> $GITHUB_OUTPUT
+        echo "CCACHE_HIT=$( [ -d /builder/ccache ] && echo '✅' || echo '❌' )" >> $GITHUB_OUTPUT
+
+    - name: Job Summary
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await core.summary
+            .addHeading('📊 OpenWrt 编译报表')
+            .addTable([
+              ['项目','值'],
+              ['设备','${{ matrix.device }}'],
+              ['源码','${{ github.event.inputs.source_repo }}'],
+              ['Tag','${{ env.VERSION_TAG }}'],
+              ['配置','${{ steps.load_config.outputs.CONFIG_TYPE }}'],
+              ['构建缓存','${{ steps.stats.outputs.BUILD_CACHE_HIT }}'],
+              ['ccache','${{ steps.stats.outputs.CCACHE_HIT }}'],
+              ['编译模式','${{ steps.build_mode.outputs.FORCE_FULLBUILD == \'true\' && \'全量\' || \'增量\' }}'],
+              ['耗时',`${process.env.DURATION_MIN}m ${process.env.DURATION_SEC}s`]
+            ])
+            .write();
+
+    # ========== 清理 ==========
+    - name: 清理过期 Cache
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const caches = await github.rest.actions.getActionsCacheList({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+
+          const now = Date.now();
+          const maxAge = 7 * 24 * 60 * 60 * 1000;
+
+          for (const c of caches.data.actions_caches) {
+            if (now - new Date(c.created_at).getTime() > maxAge) {
+              await github.rest.actions.deleteActionsCacheByKey({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                key: c.key
+              });
+            }
+          }
