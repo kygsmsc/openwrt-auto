@@ -1,15 +1,17 @@
-#==========================================================================================
-# OpenWrt CI · LTS Final
-# - 多设备并行
-# - 按 device 自动选择 .config.<device>
-# - 增量 / 全量智能编译
-# - ccache 独立缓存
+#============================================================================================
+# OpenWrt CI · 终极稳定安全版
+# - 手动选择源码 / 版本 / 设备
+# - 按 device 自动加载 .config.<device>
+# - SSH 安全模式（超时 + 自动保存配置）
+# - feeds / 自定义脚本支持
+# - 缓存隔离（源码 / 版本 / device / config）
 # - 编译报表 + 缓存命中率
-# - 失败自动保留 build_dir
+# - 失败保留 build_dir
 # - 自动清理过期 cache
-#==========================================================================================
+# - Release 安全模式（可选删除旧版本）
+#============================================================================================
 
-name: openwrt在线编译终极稳定版
+name: OpenWrt 配置生成+自动编译一体化（终极稳定版）
 
 permissions:
   contents: write
@@ -19,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       source_repo:
-        description: "OpenWrt 源码仓库"
+        description: "选择 OpenWrt 源码仓库"
         required: true
         default: "kygs-immortalwrt-master"
         type: choice
@@ -35,45 +37,64 @@ on:
           - kygs-istoreos-24.10
 
       version_tag:
-        description: "源码版本（latest = 分支 HEAD）"
+        description: "选择源码版本 Tag"
         required: true
         default: "latest"
         type: choice
         options:
           - latest
           - openwrt-24.10
-          - openwrt-23.05
+          - v24.10.1
+          - v23.05.0
           - v23.05.1
           - v23.05.2
           - v23.05.3
           - v23.05.4
 
-      config_base:
-        description: "配置基础名（如 .config）"
+      device:
+        description: "选择编译设备"
+        required: true
+        default: "x86_64"
+        type: choice
+        options:
+          - x86_64
+          - rpi-4
+          - nanopi-r2s
+
+      config_save_path:
+        description: "配置文件前缀（不含 .<device>）"
         required: true
         default: ".config"
         type: string
 
-      delete_last_release:
-        description: "删除上一个 Release"
+      ssh:
+        description: "启用 SSH 连接（安全模式）"
         required: false
         default: false
         type: boolean
 
+      ssh_timeout:
+        description: "SSH 最大等待时间（分钟）"
+        required: false
+        default: "30"
+        type: string
+
+      delete_last_release:
+        description: "是否删除上一个 Release"
+        required: false
+        default: "false"
+        type: boolean
+
       use_cache:
-        description: "是否加载旧缓存（仍会保存本次）"
+        description: "是否使用编译缓存"
         required: false
-        default: true
+        default: "true"
         type: boolean
-
-      ssh:
-        description: "启用 SSH 连接（可在线 make menuconfig）"
-        required: false
-        default: true
-        type: boolean
-
 
 env:
+  FEEDS_CONF: feeds.conf.default
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
   TZ: Asia/Shanghai
   CONFIG_CCACHE: y
   CCACHE_DIR: /builder/ccache
@@ -86,15 +107,11 @@ jobs:
       fail-fast: false
       matrix:
         device:
-          - x86_64
-          - rpi-4
-          - nanopi-r2s
-
+          - ${{ github.event.inputs.device }}
     env:
       DEVICE: ${{ matrix.device }}
 
     steps:
-    # ========== 基础环境 ==========
     - name: 记录开始时间
       run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
 
@@ -103,7 +120,8 @@ jobs:
       with:
         persist-credentials: true
 
-    - name: 安装依赖
+    # ==================== 基础环境 ====================
+    - name: 安装编译依赖
       run: |
         sudo apt-get -qq update
         sudo apt-get -qq install build-essential ccache cmake flex bison gawk \
@@ -116,7 +134,7 @@ jobs:
         sudo chown $USER:$GROUPS /builder
         ccache -M 10G
 
-    # ========== 源码 ==========
+    # ==================== 源码 ====================
     - name: 解析源码仓库
       id: repo
       run: |
@@ -158,142 +176,164 @@ jobs:
           ${{ steps.repo.outputs.REPO_URL }} openwrt
         ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
 
-    # ========== 配置 ==========
-    - name: 加载设备配置
-      id: load_config
-      run: |
-        BASE="${{ github.event.inputs.config_base }}"
-        DEVICE_CFG="${BASE}.${DEVICE}"
-
-        if [ -f "$DEVICE_CFG" ]; then
-          cp "$DEVICE_CFG" openwrt/.config
-          echo "CONFIG_TYPE=device" >> $GITHUB_OUTPUT
-        elif [ -f "$BASE" ]; then
-          cp "$BASE" openwrt/.config
-          echo "CONFIG_TYPE=default" >> $GITHUB_OUTPUT
-        else
-          echo "::error::未找到配置文件"
-          exit 1
-        fi
-        
-    - name: SSH 远程连接（可选）
-      if: github.event.inputs.ssh == 'true'
-      uses: rdp-studio/ssh2actions@main
-      # ★修改原因：原v1标签不存在，切换main分支避免无法拉取action报错
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        
-    - name: 生成 .config
-      id: defconfig
-      run: |
-        cd openwrt
-        make defconfig
-        CONFIG_HASH=$(sha256sum .config | cut -d' ' -f1)
-        echo "CONFIG_HASH=$CONFIG_HASH" >> $GITHUB_OUTPUT
-        echo "FILE_DATE=$(date +%Y%m%d%H%M)" >> $GITHUB_ENV
-
-    # ========== 缓存 ==========
-    - name: 缓存构建目录
+    # ==================== 缓存 ====================
+    - name: 缓存编译目录
+      if: github.event.inputs.use_cache == 'true'
       uses: actions/cache@v4
       with:
         path: |
           /builder/dl
           /builder/build_dir
           /builder/staging_dir
-        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-${{ steps.defconfig.outputs.CONFIG_HASH }}
+        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-${{ hashFiles(format('.config.{0}', matrix.device)) }}
         restore-keys: |
           openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-
-        lookup-only: ${{ github.event.inputs.use_cache != 'true' }}
 
-    - name: 缓存 ccache
-      uses: actions/cache@v4
-      with:
-        path: /builder/ccache
-        key: ccache-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-${{ steps.defconfig.outputs.CONFIG_HASH }}
-        restore-keys: |
-          ccache-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.device }}-
-        lookup-only: ${{ github.event.inputs.use_cache != 'true' }}
-
-    - name: 显示缓存状态
+    - name: 清理缓存（禁用缓存时）
+      if: github.event.inputs.use_cache == 'false'
       run: |
-        [ -d /builder/build_dir ] && echo "✅ Build cache HIT" || echo "❌ Build cache MISS"
-        [ -d /builder/ccache ] && echo "✅ ccache HIT" || echo "❌ ccache MISS"
+        sudo rm -rf /builder/dl /builder/build_dir /builder/staging_dir
+        ccache -C
 
-    # ========== Feeds / 编译准备 ==========
-    - name: Feeds
+    # ==================== Feeds & 自定义脚本 ====================
+    - name: 加载 feeds 配置
+      run: |
+        cd openwrt
+        if [[ -f "$FEEDS_CONF" && "$FEEDS_CONF" != "feeds.conf.default" ]]; then
+          cp -f "$FEEDS_CONF" feeds.conf.default
+        fi
+
+    - name: 执行自定义脚本1
+      run: |
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新 feeds
       run: |
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: 判断编译模式
-      id: build_mode
+    # ==================== 配置 ====================
+    - name: 加载设备配置
+      id: load_config
       run: |
-        if git diff --name-only HEAD~1 | grep -E 'feeds|package'; then
-          echo "FORCE_FULLBUILD=true" >> $GITHUB_OUTPUT
+        CFG="${{ github.event.inputs.config_save_path }}.${DEVICE}"
+        if [ -f "$CFG" ]; then
+          cp -f "$CFG" openwrt/.config
+          echo "CONFIG_TYPE=device" >> $GITHUB_OUTPUT
+        elif [ -f "${{ github.event.inputs.config_save_path }}" ]; then
+          cp -f "${{ github.event.inputs.config_save_path }}" openwrt/.config
+          echo "CONFIG_TYPE=default" >> $GITHUB_OUTPUT
         else
-          echo "FORCE_FULLBUILD=false" >> $GITHUB_OUTPUT
+          echo "::error::未找到配置文件"
+          exit 1
         fi
+        
+    - name: 执行自定义脚本2
+      run: |
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+        
+    - name: 生成 .config
+      run: |
+        cd openwrt
+        make defconfig
+        echo "FILE_DATE=$(date +%Y%m%d%H%M)" >> $GITHUB_ENV
 
-    - name: 编译
+    # ==================== SSH 安全模式 ====================
+    - name: SSH 远程连接（安全模式）
+      if: github.event.inputs.ssh == 'true'
+      uses: rdp-studio/ssh2actions@main
+      timeout-minutes: ${{ fromJSON(github.event.inputs.ssh_timeout) }}
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    - name: SSH 后保存配置
+      if: github.event.inputs.ssh == 'true'
+      run: |
+        cd $GITHUB_WORKSPACE
+        CFG="${{ github.event.inputs.config_save_path }}.${DEVICE}"
+        cp -f openwrt/.config "$CFG"
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add "$CFG"
+        git commit -m "ci: update .config for ${DEVICE} [skip ci]" || echo "No changes"
+        git push
+
+    # ==================== 编译 ====================
+    - name: 下载依赖
+      run: |
+        cd openwrt
+        make download -j$(nproc)
+        find dl -size -1024c -delete
+
+    - name: 编译固件
       id: compile
       run: |
         cd openwrt
-        if [ "${{ steps.build_mode.outputs.FORCE_FULLBUILD }}" = "true" ]; then
-          make -j$(nproc) V=w
-        else
-          make target/compile -j$(nproc) V=w
-          make package/compile -j$(nproc) V=w
-          make package/index
-        fi
+        make -j$(nproc) V=w
         echo "status=success" >> $GITHUB_OUTPUT
 
-    # ========== 失败调试 ==========
     - name: 失败时上传 build_dir
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: debug-build_dir-${{ matrix.device }}
+        name: build_dir_${{ matrix.device }}
         path: /builder/build_dir
         retention-days: 3
 
-    # ========== 报表 ==========
+    # ==================== 发布 ====================
+    - name: 整理固件
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+
+    - name: 删除旧 Release
+      if: github.event.inputs.delete_last_release == 'true'
+      uses: dev-drprasad/delete-older-releases@v0.3.0
+      with:
+        keep_latest: 0
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 创建 Release
+      if: steps.compile.outputs.status == 'success'
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ matrix.device }}-${{ env.VERSION_TAG }}-${{ env.FILE_DATE }}
+        name: OpenWrt ${{ env.VERSION_TAG }} · ${{ matrix.device }}
+        files: ${{ env.FIRMWARE }}/*
+
+    # ==================== 报表 ====================
     - name: 编译统计
       if: always()
-      id: stats
       run: |
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
         MIN=$((DURATION / 60))
         SEC=$((DURATION % 60))
 
-        echo "DURATION_MIN=$MIN" >> $GITHUB_OUTPUT
-        echo "DURATION_SEC=$SEC" >> $GITHUB_OUTPUT
-        echo "BUILD_CACHE_HIT=$( [ -d /builder/build_dir ] && echo '✅' || echo '❌' )" >> $GITHUB_OUTPUT
-        echo "CCACHE_HIT=$( [ -d /builder/ccache ] && echo '✅' || echo '❌' )" >> $GITHUB_OUTPUT
+        echo "## 📊 OpenWrt 编译报表" >> $GITHUB_STEP_SUMMARY
+        echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| 设备 | ${{ matrix.device }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 源码 | ${{ github.event.inputs.source_repo }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 版本 | ${{ env.VERSION_TAG }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 配置 | ${{ steps.load_config.outputs.CONFIG_TYPE }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 构建缓存 | $( [ -d /builder/build_dir ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| ccache | $( [ -d /builder/ccache ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| 耗时 | ${MIN}m ${SEC}s |" >> $GITHUB_STEP_SUMMARY
 
-    - name: 构建概览
-      if: always()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          await core.summary
-            .addHeading('📊 OpenWrt 编译报表')
-            .addTable([
-              ['项目','值'],
-              ['设备','${{ matrix.device }}'],
-              ['源码','${{ github.event.inputs.source_repo }}'],
-              ['Tag','${{ env.VERSION_TAG }}'],
-              ['配置','${{ steps.load_config.outputs.CONFIG_TYPE }}'],
-              ['构建缓存','${{ steps.stats.outputs.BUILD_CACHE_HIT }}'],
-              ['ccache','${{ steps.stats.outputs.CCACHE_HIT }}'],
-              ['编译模式','${{ steps.build_mode.outputs.FORCE_FULLBUILD == 'true' && '全量' || '增量' }}'],
-              ['耗时',`${process.env.DURATION_MIN}m ${process.env.DURATION_SEC}s`]
-            ])
-            .write();
-
-    # ========== 清理 ==========
+    # ==================== 清理过期 Cache ====================
     - name: 清理过期 Cache
       if: always()
       uses: actions/github-script@v7
@@ -304,10 +344,8 @@ jobs:
             repo: context.repo.repo,
             per_page: 100
           });
-
           const now = Date.now();
           const maxAge = 7 * 24 * 60 * 60 * 1000;
-
           for (const c of caches.data.actions_caches) {
             if (now - new Date(c.created_at).getTime() > maxAge) {
               await github.rest.actions.deleteActionsCacheByKey({
