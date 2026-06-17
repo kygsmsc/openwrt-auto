@@ -66,6 +66,13 @@ on:
         default: true
         type: boolean
 
+      ssh:
+        description: "启用 SSH 连接（可在线 make menuconfig）"
+        required: false
+        default: true
+        type: boolean
+
+
 env:
   TZ: Asia/Shanghai
   CONFIG_CCACHE: y
@@ -168,7 +175,15 @@ jobs:
           echo "::error::未找到配置文件"
           exit 1
         fi
-
+        
+    - name: SSH 远程连接（可选）
+      if: github.event.inputs.ssh == 'true'
+      uses: rdp-studio/ssh2actions@main
+      # ★修改原因：原v1标签不存在，切换main分支避免无法拉取action报错
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        
     - name: 生成 .config
       id: defconfig
       run: |
