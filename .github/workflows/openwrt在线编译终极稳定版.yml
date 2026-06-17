@@ -258,7 +258,7 @@ jobs:
         echo "BUILD_CACHE_HIT=$( [ -d /builder/build_dir ] && echo '✅' || echo '❌' )" >> $GITHUB_OUTPUT
         echo "CCACHE_HIT=$( [ -d /builder/ccache ] && echo '✅' || echo '❌' )" >> $GITHUB_OUTPUT
 
-    - name: Job Summary
+    - name: 构建概览
       if: always()
       uses: actions/github-script@v7
       with:
@@ -273,7 +273,7 @@ jobs:
               ['配置','${{ steps.load_config.outputs.CONFIG_TYPE }}'],
               ['构建缓存','${{ steps.stats.outputs.BUILD_CACHE_HIT }}'],
               ['ccache','${{ steps.stats.outputs.CCACHE_HIT }}'],
-              ['编译模式','${{ steps.build_mode.outputs.FORCE_FULLBUILD == \'true\' && \'全量\' || \'增量\' }}'],
+              ['编译模式','${{ steps.build_mode.outputs.FORCE_FULLBUILD == 'true' && '全量' || '增量' }}'],
               ['耗时',`${process.env.DURATION_MIN}m ${process.env.DURATION_SEC}s`]
             ])
             .write();
