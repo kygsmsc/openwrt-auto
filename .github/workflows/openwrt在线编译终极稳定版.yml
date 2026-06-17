@@ -60,6 +60,11 @@ on:
           - x86_64
           - rpi-4
           - nanopi-r2s
+          - mt7621        # 联发科 MT7621（新三/K2P/R3G/AH794-MT7621）
+          - mt7620        # 联发科 MT7620 老款
+          - mt798x        # 联发科 Filogic Wi-Fi 6（红米AX6000等）
+          - ath79         # 高通 Atheros 老款（TP-Link WR1043ND等）
+          - ipq40xx 
 
       config_save_path:
         description: "配置文件前缀（不含 .<device>）"
