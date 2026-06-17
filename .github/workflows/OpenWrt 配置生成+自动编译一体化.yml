@@ -12,7 +12,8 @@ name: OpenWrt 配置生成+自动编译一体化
 # 【新增】权限声明：新版GH Actions默认只读，必须开启write才能提交/推送文件回仓库
 permissions:
   contents: write
-
+  # ★修改原因：删除历史workflow runs接口需要actions写入权限，原生GITHUB_TOKEN默认没有，补充后解决403 Resource not accessible报错
+  actions: write
 on:
   repository_dispatch:
   workflow_dispatch:
