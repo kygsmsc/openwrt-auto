@@ -1,6 +1,7 @@
 #============================================================================================
-# OpenWrt CI · 终极稳定安全版
+# OpenWrt CI · 终极稳定安全版（集成版本切换）
 # - 手动选择源码 / 版本 / 设备
+# - 自动切换分支或 Tag（支持 kygs-immortalwrt-master + openwrt-24.10）
 # - 按 device 自动加载 .config.<device>
 # - SSH 安全模式（超时 + 自动保存配置）
 # - feeds / 自定义脚本支持
@@ -37,7 +38,7 @@ on:
           - kygs-istoreos-24.10
 
       version_tag:
-        description: "选择源码版本 Tag"
+        description: "选择源码版本（latest / 分支名 / Tag）"
         required: true
         default: "latest"
         type: choice
@@ -60,11 +61,11 @@ on:
           - x86_64
           - rpi-4
           - nanopi-r2s
-          - mt7621        # 联发科 MT7621（新三/K2P/R3G/AH794-MT7621）
-          - mt7620        # 联发科 MT7620 老款
-          - mt798x        # 联发科 Filogic Wi-Fi 6（红米AX6000等）
-          - ath79         # 高通 Atheros 老款（TP-Link WR1043ND等）
-          - ipq40xx 
+          - mt7621
+          - mt7620
+          - mt798x
+          - ath79
+          - ipq40xx
 
       config_save_path:
         description: "配置文件前缀（不含 .<device>）"
@@ -173,13 +174,46 @@ jobs:
             echo "REPO_BRANCH=istoreos-24.10" >> $GITHUB_OUTPUT ;;
         esac
 
-    - name: 克隆源码
+        echo "🔍 校验远程分支: $REPO_BRANCH"
+        if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
+          echo "::error::远程仓库不存在分支 $REPO_BRANCH"
+          exit 1
+        fi
+
+    - name: 克隆源码并切换版本
       working-directory: /builder
       run: |
         rm -rf openwrt
         git clone -b ${{ steps.repo.outputs.REPO_BRANCH }} \
           ${{ steps.repo.outputs.REPO_URL }} openwrt
+
         ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
+        cd openwrt
+
+        TAG_INPUT="${{ env.VERSION_TAG }}"
+
+        if [[ "$TAG_INPUT" == "latest" ]]; then
+          echo "✅ 使用默认分支最新代码"
+
+        elif [[ "$TAG_INPUT" =~ ^v[0-9] ]]; then
+          echo "📌 识别为版本 Tag: $TAG_INPUT"
+          git fetch --tags
+          if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG_INPUT 不存在"
+            exit 1
+          fi
+          git checkout -b build_$TAG_INPUT $TAG_INPUT
+
+        else
+          echo "📌 尝试切换为分支或 Tag: $TAG_INPUT"
+          git fetch --tags
+          if git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            git checkout -b build_$TAG_INPUT $TAG_INPUT
+          else
+            git fetch origin "$TAG_INPUT":"$TAG_INPUT"
+            git checkout "$TAG_INPUT"
+          fi
+        fi
 
     # ==================== 缓存 ====================
     - name: 缓存编译目录
@@ -235,13 +269,13 @@ jobs:
           echo "::error::未找到配置文件"
           exit 1
         fi
-        
+
     - name: 执行自定义脚本2
       run: |
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        
+
     - name: 生成 .config
       run: |
         cd openwrt
