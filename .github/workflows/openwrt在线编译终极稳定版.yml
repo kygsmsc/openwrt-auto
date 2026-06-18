@@ -144,42 +144,50 @@ jobs:
     - name: 解析源码仓库
       id: repo
       run: |
-        case "${{ github.event.inputs.source_repo }}" in
+        INPUT="${{ github.event.inputs.source_repo }}"
+        echo "DEBUG source_repo=[$INPUT]"
+
+        case "$INPUT" in
           lede-master)
-            echo "REPO_URL=https://github.com/coolsnowwolf/lede" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=master" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/coolsnowwolf/lede
+            REPO_BRANCH=master ;;
           openwrt-main)
-            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=main" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=main ;;
           openwrt-24.10)
-            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=openwrt-24.10" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=openwrt-24.10 ;;
           openwrt-23.05)
-            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=openwrt-23.05" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=openwrt-23.05 ;;
           immortalwrt-master)
-            echo "REPO_URL=https://github.com/immortalwrt/immortalwrt" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=master" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/immortalwrt/immortalwrt
+            REPO_BRANCH=master ;;
           immortalwrt-24.10)
-            echo "REPO_URL=https://github.com/immortalwrt/immortalwrt" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=openwrt-24.10" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/immortalwrt/immortalwrt
+            REPO_BRANCH=openwrt-24.10 ;;
           istoreos-master)
-            echo "REPO_URL=https://github.com/istoreos/istoreos" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=main" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/istoreos/istoreos
+            REPO_BRANCH=main ;;
           kygs-immortalwrt-master)
-            echo "REPO_URL=https://github.com/kygsmsc/immortalwrt" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=master" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/kygsmsc/immortalwrt
+            REPO_BRANCH=master ;;
           kygs-istoreos-24.10)
-            echo "REPO_URL=https://github.com/kygsmsc/istoreos" >> $GITHUB_OUTPUT
-            echo "REPO_BRANCH=istoreos-24.10" >> $GITHUB_OUTPUT ;;
+            REPO_URL=https://github.com/kygsmsc/istoreos
+            REPO_BRANCH=istoreos-24.10 ;;
+          *)
+            echo "::error::未知 source_repo: $INPUT"
+            exit 1 ;;
         esac
+
+        echo "REPO_URL=$REPO_URL" >> $GITHUB_OUTPUT
+        echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_OUTPUT
 
         echo "🔍 校验远程分支: $REPO_BRANCH"
         if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
-          echo "::error::远程仓库不存在分支 $REPO_BRANCH"
+          echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
           exit 1
         fi
-
     - name: 克隆源码并切换版本
       working-directory: /builder
       run: |
