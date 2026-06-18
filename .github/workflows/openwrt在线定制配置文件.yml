@@ -1,0 +1,215 @@
+name: openwrt在线定制配置文件
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        description: "选择 OpenWrt 源码仓库"
+        required: true
+        default: "kygs-immortalwrt-master"
+        type: choice
+        options:
+          - lede-master
+          - openwrt-main
+          - openwrt-24.10
+          - openwrt-23.05
+          - immortalwrt-master
+          - immortalwrt-24.10
+          - istoreos-master
+          - kygs-immortalwrt-master
+          - kygs-istoreos-24.10
+
+      version_tag:
+        description: "选择源码版本（latest / 分支名 / Tag）"
+        required: true
+        default: "latest"
+        type: choice
+        options:
+          - latest
+          - openwrt-24.10
+          - v24.10.1
+          - v23.05.0
+          - v23.05.1
+          - v23.05.2
+          - v23.05.3
+          - v23.05.4
+
+      ssh:
+        description: "启用 SSH 连接（安全模式）"
+        required: false
+        default: false
+        type: boolean
+
+      ssh_timeout:
+        description: "SSH 最大等待时间（分钟）"
+        required: false
+        default: "30"
+        type: string
+
+env:
+  FEEDS_CONF: feeds.conf.default
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
+  CONFIG_CCACHE: y
+  CCACHE_DIR: /builder/ccache
+  VERSION_TAG: ${{ github.event.inputs.version_tag }}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@main
+
+    - name: 安装系统依赖
+      run: |
+        sudo apt update -y
+        sudo apt install -y build-essential cmake flex bison gawk gcc-multilib g++-multilib \
+        libncurses5-dev python2 python3 git wget curl zip unzip bzip2 p7zip-full rsync file \
+        gettext libssl-dev libelf-dev autopoint libtool-bin perl findutils grep libreadline-dev
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 记录开始时间
+      run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+    - name: 检出仓库
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: true
+
+    # ==================== 源码 ====================
+    - name: 解析源码仓库
+      id: repo
+      run: |
+        INPUT="${{ github.event.inputs.source_repo }}"
+        echo "DEBUG source_repo=[$INPUT]"
+
+        case "$INPUT" in
+          lede-master)
+            REPO_URL=https://github.com/coolsnowwolf/lede
+            REPO_BRANCH=master ;;
+          openwrt-main)
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=main ;;
+          openwrt-24.10)
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=openwrt-24.10 ;;
+          openwrt-23.05)
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=openwrt-23.05 ;;
+          immortalwrt-master)
+            REPO_URL=https://github.com/immortalwrt/immortalwrt
+            REPO_BRANCH=master ;;
+          immortalwrt-24.10)
+            REPO_URL=https://github.com/immortalwrt/immortalwrt
+            REPO_BRANCH=openwrt-24.10 ;;
+          istoreos-master)
+            REPO_URL=https://github.com/istoreos/istoreos
+            REPO_BRANCH=main ;;
+          kygs-immortalwrt-master)
+            REPO_URL=https://github.com/kygsmsc/immortalwrt
+            REPO_BRANCH=master ;;
+          kygs-istoreos-24.10)
+            REPO_URL=https://github.com/kygsmsc/istoreos
+            REPO_BRANCH=istoreos-24.10 ;;
+          *)
+            echo "::error::未知 source_repo: $INPUT"
+            exit 1 ;;
+        esac
+
+        echo "REPO_URL=$REPO_URL" >> $GITHUB_OUTPUT
+        echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_OUTPUT
+
+        echo "🔍 校验远程分支: $REPO_BRANCH"
+        if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
+          echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
+          exit 1
+        fi
+    - name: 克隆源码并切换版本
+      working-directory: /builder
+      run: |
+        rm -rf openwrt
+        git clone -b ${{ steps.repo.outputs.REPO_BRANCH }} \
+          ${{ steps.repo.outputs.REPO_URL }} openwrt
+
+        ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
+        cd openwrt
+
+        TAG_INPUT="${{ env.VERSION_TAG }}"
+
+        if [[ "$TAG_INPUT" == "latest" ]]; then
+          echo "✅ 使用默认分支最新代码"
+
+        elif [[ "$TAG_INPUT" =~ ^v[0-9] ]]; then
+          echo "📌 识别为版本 Tag: $TAG_INPUT"
+          git fetch --tags
+          if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG_INPUT 不存在"
+            exit 1
+          fi
+          git checkout -b build_$TAG_INPUT $TAG_INPUT
+
+        else
+          echo "📌 尝试切换为分支或 Tag: $TAG_INPUT"
+          git fetch --tags
+          if git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            git checkout -b build_$TAG_INPUT $TAG_INPUT
+          else
+            git fetch origin "$TAG_INPUT":"$TAG_INPUT"
+            git checkout "$TAG_INPUT"
+          fi
+        fi
+
+    # ==================== Feeds & 自定义脚本 ====================
+    - name: 加载 feeds 配置
+      run: |
+        cd openwrt
+        if [[ -f "$FEEDS_CONF" && "$FEEDS_CONF" != "feeds.conf.default" ]]; then
+          cp -f "$FEEDS_CONF" feeds.conf.default
+        fi
+
+    - name: 执行自定义脚本1
+      run: |
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新 feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 执行自定义脚本2
+      run: |
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    # ==================== SSH 安全模式 ====================
+    - name: SSH 远程连接（安全模式）
+      if: github.event.inputs.ssh == 'true'
+      uses: rdp-studio/ssh2actions@main
+      timeout-minutes: ${{ fromJSON(github.event.inputs.ssh_timeout) }}
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    - name: SSH 后上传所有 .config 到仓库根目录
+      if: github.event.inputs.ssh == 'true'
+      run: |
+        cd $GITHUB_WORKSPACE
+
+        echo "📦 复制所有 .config 文件到仓库根目录"
+        cp -v openwrt/*.config . || true
+
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add *.config
+        git commit -m "ci: upload all .config files [skip ci]" || echo "No changes"
+        git push
