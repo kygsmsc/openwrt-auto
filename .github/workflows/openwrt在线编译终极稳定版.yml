@@ -188,6 +188,7 @@ jobs:
           echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
           exit 1
         fi
+
     - name: 克隆源码并切换版本
       working-directory: /builder
       run: |
@@ -341,6 +342,55 @@ jobs:
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
+    # ▶ 解析路由器型号 / 内核版本 / 配置名 / 发布类型
+    - name: 解析固件元信息
+      if: steps.compile.outputs.status == 'success'
+      id: meta
+      run: |
+        cd openwrt
+
+        # ▶ 路由器型号（优先 .config）
+        BOARD=$(grep -E "^CONFIG_TARGET_BOARD=" .config | cut -d'"' -f2)
+        [ -z "$BOARD" ] && BOARD="${{ matrix.device }}"
+
+        # ▶ 内核版本
+        KERNEL=$(grep -E "^CONFIG_KERNEL_PATCHVER=" .config | cut -d'"' -f2)
+        [ -z "$KERNEL" ] && KERNEL="unknown"
+
+        # ▶ 配置名（去扩展名）
+        CFG_PATH="${{ github.event.inputs.config_save_path }}.${DEVICE}"
+        [ ! -f "$CFG_PATH" ] && CFG_PATH="${{ github.event.inputs.config_save_path }}"
+        CFG_NAME=$(basename "$CFG_PATH")
+        CFG_NAME="${CFG_NAME%.*}"
+
+        # ▶ 正式版 / 测试版
+        if [[ "${{ env.VERSION_TAG }}" == "latest" || "${{ env.VERSION_TAG }}" == *rc* ]]; then
+          BUILD_TYPE="TEST"
+        else
+          BUILD_TYPE="RELEASE"
+        fi
+
+        echo "BOARD=$BOARD" >> $GITHUB_OUTPUT
+        echo "KERNEL=$KERNEL" >> $GITHUB_OUTPUT
+        echo "CFG_NAME=$CFG_NAME" >> $GITHUB_OUTPUT
+        echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_OUTPUT
+
+    # ▶ 生成 README
+    - name: 生成固件说明 README
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        cat <<EOF > ${{ env.FIRMWARE }}/README.md
+        # OpenWrt Firmware
+
+        - Project   : ${{ github.event.repository.name }}
+        - Version   : ${{ env.VERSION_TAG }}
+        - Kernel    : ${{ steps.meta.outputs.KERNEL }}
+        - Device    : ${{ steps.meta.outputs.BOARD }}
+        - Config    : ${{ steps.meta.outputs.CFG_NAME }}
+        - Build     : ${{ steps.meta.outputs.BUILD_TYPE }}
+        - Date      : ${{ env.FILE_DATE }}
+        EOF
+
     - name: 删除旧 Release
       if: github.event.inputs.delete_last_release == 'true'
       uses: dev-drprasad/delete-older-releases@v0.3.0
@@ -350,42 +400,18 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 生成 Release 名称
-      if: steps.compile.outputs.status == 'success'
-      id: release_meta
-      run: |
-        # ▶ 使用 GitHub 仓库名称作为前缀
-        REPO_NAME="${{ github.event.repository.name }}"
-
-        # ▶ 使用输入版本标签
-        VERSION="${{ env.VERSION_TAG }}"
-
-        # ▶ 提取配置文件名（去掉路径和扩展名）
-        CFG_PATH="${{ github.event.inputs.config_save_path }}.${DEVICE}"
-        if [ ! -f "$CFG_PATH" ]; then
-          CFG_PATH="${{ github.event.inputs.config_save_path }}"
-        fi
-
-        CFG_NAME=$(basename "$CFG_PATH")
-        CFG_NAME="${CFG_NAME%.*}"
-
-        # ▶ 使用 YYYY.MM.DD 格式时间
-        DATE="${{ env.FILE_DATE }}"
-
-        # ▶ 拼接最终 Release 名称
-        RELEASE_NAME="${REPO_NAME}_${VERSION}_${CFG_NAME}_${DATE}"
-
-        echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_OUTPUT
-
+    # ▶ 最终 Release 名称
     - name: 创建 Release
       if: steps.compile.outputs.status == 'success'
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.release_meta.outputs.RELEASE_NAME }}
-        name: ${{ steps.release_meta.outputs.RELEASE_NAME }}
-        files: ${{ env.FIRMWARE }}/*
+        tag_name: ${{ github.event.repository.name }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
+        name: ${{ github.event.repository.name }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
+        files: |
+          ${{ env.FIRMWARE }}/*
+          ${{ env.FIRMWARE }}/README.md
 
     # ==================== 报表 ====================
     - name: 编译统计
@@ -400,9 +426,12 @@ jobs:
         echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
         echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
         echo "| 设备 | ${{ matrix.device }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 路由器 | ${{ steps.meta.outputs.BOARD }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 内核 | ${{ steps.meta.outputs.KERNEL }} |" >> $GITHUB_STEP_SUMMARY
         echo "| 源码 | ${{ github.event.inputs.source_repo }} |" >> $GITHUB_STEP_SUMMARY
         echo "| 版本 | ${{ env.VERSION_TAG }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 配置 | ${{ steps.load_config.outputs.CONFIG_TYPE }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 配置 | ${{ steps.meta.outputs.CFG_NAME }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 构建类型 | ${{ steps.meta.outputs.BUILD_TYPE }} |" >> $GITHUB_STEP_SUMMARY
         echo "| 构建缓存 | $( [ -d /builder/build_dir ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
         echo "| ccache | $( [ -d /builder/ccache ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
         echo "| 耗时 | ${MIN}m ${SEC}s |" >> $GITHUB_STEP_SUMMARY
