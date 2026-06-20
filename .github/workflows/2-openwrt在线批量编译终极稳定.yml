@@ -212,7 +212,7 @@ jobs:
           /builder/staging_dir
         key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}
         restore-keys: |
-          openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}-
+          openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}
 
     - name: 清理缓存（禁用缓存时）
       if: github.event.inputs.use_cache == 'false'
