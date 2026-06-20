@@ -372,7 +372,8 @@ jobs:
         else
           BUILD_TYPE="RELEASE"
         fi
-
+        # ▶ 生成固件时间（精确到分钟，用于 Release 命名）
+        echo "FILE_DATETIME=$(date +%Y.%m.%d-%H%M)" >> $GITHUB_ENV
         echo "BOARD=$BOARD" >> $GITHUB_OUTPUT
         echo "KERNEL=$KERNEL" >> $GITHUB_OUTPUT
         echo "CFG_NAME=$CFG_NAME" >> $GITHUB_OUTPUT
@@ -385,13 +386,13 @@ jobs:
         cat <<EOF > ${{ env.FIRMWARE }}/README.md
         # OpenWrt Firmware
 
-        - Project   : ${{ steps.repo.outputs.SOURCE_REPO_NAME }}
-        - Version   : ${{ env.VERSION_TAG }}
-        - Kernel    : ${{ steps.meta.outputs.KERNEL }}
-        - Device    : ${{ steps.meta.outputs.BOARD }}
-        - Config    : ${{ steps.meta.outputs.CFG_NAME }}
-        - Build     : ${{ steps.meta.outputs.BUILD_TYPE }}
-        - Date      : ${{ env.FILE_DATE }}
+        - 项目 : ${{ steps.repo.outputs.SOURCE_REPO_NAME }}
+        - 版本 : ${{ env.VERSION_TAG }}
+        - 内核 : ${{ steps.meta.outputs.KERNEL }}
+        - 设备 : ${{ steps.meta.outputs.BOARD }}
+        - 配置 : ${{ steps.meta.outputs.CFG_NAME }}
+        - 构建 : ${{ steps.meta.outputs.BUILD_TYPE }}
+        - 日期 : ${{ env.FILE_DATETIME }}
         EOF
 
     - name: 删除旧 Release
@@ -410,11 +411,12 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
-        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
+        
+        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATETIME }}
+        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATETIME }}
         files: |
           ${{ env.FIRMWARE }}/*
-          ${{ env.FIRMWARE }}/README.md
+    
 
     # ==================== 报表 ====================
     - name: 编译统计
