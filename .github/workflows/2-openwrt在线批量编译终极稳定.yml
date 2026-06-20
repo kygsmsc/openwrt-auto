@@ -50,13 +50,6 @@ on:
         default: "true"
         type: boolean
 
-      # ★ 原 device 输入保留但不再使用（仅供回溯）
-      # device:
-      #   description: "（已废弃）原手动指定设备标识"
-      #   required: false
-      #   default: "x86_64"
-      #   type: string
-
 env:
   FEEDS_CONF: feeds.conf.default
   DIY_P1_SH: diy-part1.sh
@@ -66,22 +59,41 @@ env:
   CCACHE_DIR: /builder/ccache
   VERSION_TAG: ${{ github.event.inputs.version_tag }}
 
+# ==================== ★ 新增：生成动态矩阵 ====================
 jobs:
-  build:
-    runs-on: ubuntu-22.04
+  set_matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      config_list: ${{ steps.gen.outputs.CONFIG_LIST }}
+    steps:
+      - uses: actions/checkout@v4
 
-    # ★ 动态矩阵：由 set-matrix job 或 collect_configs step 注入
-    # 此处先写固定占位，实际由下方 steps.collect_configs.outputs.CONFIG_LIST 驱动
+      - name: ★ 扫描并生成 config 矩阵
+        id: gen
+        run: |
+          FILES=$(find . -maxdepth 1 -name '*.config' -printf '%f\n')
+          if [ -z "$FILES" ]; then
+            echo "::error::仓库根目录未找到任何 *.config 文件"
+            exit 1
+          fi
+
+          echo "🔍 发现配置文件："
+          echo "$FILES"
+
+          {
+            echo "CONFIG_LIST<<EOF"
+            echo "$FILES" | jq -R -s 'split("\n") | map(select(length>0))'
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+# ==================== 编译 Job ====================
+  build:
+    needs: set_matrix
+    runs-on: ubuntu-22.04
     strategy:
-      fail-fast: false   # ★ 单 config 失败不影响其余
+      fail-fast: false
       matrix:
-        config: ${{ fromJson(needs.set_matrix.outputs.config_list || '["dummy"]') }}
-    # 注：若你不想拆 set_matrix job，可直接用下面单行替代上面 matrix（二选一）：
-    # matrix:
-    #   config:
-    #     - x86_64.config
-    #     - r4s.config
-    # 推荐做法见下方 ★ 新增 set_matrix job（已附在文末）
+        config: ${{ fromJson(needs.set_matrix.outputs.config_list) }}
 
     env:
       DEVICE: ${{ matrix.config }}
@@ -94,20 +106,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         persist-credentials: true
-
-    # ==================== ★ 新增：收集所有 *.config ====================
-    - name: ★ 收集所有设备配置(.config)
-      id: collect_configs
-      run: |
-        echo "🔍 扫描仓库根目录 *.config ..."
-        FILES=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -name '*.config' -printf '%f\n')
-        if [ -z "$FILES" ]; then
-          echo "::error::仓库根目录未找到任何 *.config 文件"
-          exit 1
-        fi
-        echo "$FILES" | tee config_list.txt
-        # 转 JSON 数组供 matrix（若拆 set_matrix job 用）
-        echo "CONFIG_LIST=$(echo "$FILES" | jq -R -s 'split("\n")|map(select(length>0))')" >> $GITHUB_OUTPUT
 
     # ==================== 基础环境 ====================
     - name: 安装编译依赖
@@ -128,8 +126,6 @@ jobs:
       id: repo
       run: |
         INPUT="${{ github.event.inputs.source_repo }}"
-        echo "DEBUG source_repo=[$INPUT]"
-
         case "$INPUT" in
           lede-master)
             REPO_URL=https://github.com/coolsnowwolf/lede
@@ -162,17 +158,11 @@ jobs:
             echo "::error::未知 source_repo: $INPUT"
             exit 1 ;;
         esac
-        SOURCE_REPO_NAME=$(basename "$REPO_URL" .git)
 
+        SOURCE_REPO_NAME=$(basename "$REPO_URL" .git)
         echo "REPO_URL=$REPO_URL" >> $GITHUB_OUTPUT
         echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_OUTPUT
         echo "SOURCE_REPO_NAME=$SOURCE_REPO_NAME" >> $GITHUB_OUTPUT
-
-        echo "🔍 校验远程分支: $REPO_BRANCH"
-        if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
-          echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
-          exit 1
-        fi
 
     - name: 克隆源码并切换版本
       working-directory: /builder
@@ -180,31 +170,18 @@ jobs:
         rm -rf openwrt
         git clone -b ${{ steps.repo.outputs.REPO_BRANCH }} \
           ${{ steps.repo.outputs.REPO_URL }} openwrt
-
         ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
         cd openwrt
 
         TAG_INPUT="${{ env.VERSION_TAG }}"
-
         if [[ "$TAG_INPUT" == "latest" ]]; then
           echo "✅ 使用默认分支最新代码"
         elif [[ "$TAG_INPUT" =~ ^v[0-9] ]]; then
-          echo "📌 识别为版本 Tag: $TAG_INPUT"
           git fetch --tags
-          if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG_INPUT 不存在"
-            exit 1
-          fi
           git checkout -b build_$TAG_INPUT $TAG_INPUT
         else
-          echo "📌 尝试切换为分支或 Tag: $TAG_INPUT"
-          git fetch --tags
-          if git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
-            git checkout -b build_$TAG_INPUT $TAG_INPUT
-          else
-            git fetch origin "$TAG_INPUT":"$TAG_INPUT"
-            git checkout "$TAG_INPUT"
-          fi
+          git fetch origin "$TAG_INPUT":"$TAG_INPUT"
+          git checkout "$TAG_INPUT"
         fi
 
     # ==================== 缓存 ====================
@@ -216,7 +193,7 @@ jobs:
           /builder/dl
           /builder/build_dir
           /builder/staging_dir
-        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}-${{ hashFiles(format('{0}', matrix.config)) }}
+        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}
         restore-keys: |
           openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}-
 
@@ -234,56 +211,22 @@ jobs:
           cp -f "$FEEDS_CONF" feeds.conf.default
         fi
 
-    # ★ 原加载设备配置（已注释，不删除）───────────────────────────────
-    # - name: 加载设备配置
-    #   id: load_config
-    #   run: |
-    #     CFG="${{ github.event.inputs.config_save_path }}.${DEVICE}"
-    #     if [ -f "$CFG" ]; then
-    #       cp -f "$CFG" openwrt/.config
-    #       echo "CONFIG_TYPE=device" >> $GITHUB_OUTPUT
-    #     elif [ -f "${{ github.event.inputs.config_save_path }}" ]; then
-    #       cp -f "${{ github.event.inputs.config_save_path }}" openwrt/.config
-    #       echo "CONFIG_TYPE=default" >> $GITHUB_OUTPUT
-    #     else
-    #       echo "::error::未找到配置文件"
-    #       exit 1
-    #     fi
-    # ────────────────────────────────────────────────────────────────
-
-    # ★ 新增：按矩阵加载当前 .config 并解析 TARGET_DEVICE / BOARD / PROFILE
+    # ★ 加载当前矩阵配置 & 解析设备信息
     - name: ★ 加载当前矩阵配置 & 解析设备信息
       id: load_config
       run: |
         CFG_FILE="${{ matrix.config }}"
         SRC="$GITHUB_WORKSPACE/$CFG_FILE"
-        if [ ! -f "$SRC" ]; then
-          echo "::error::配置文件 $CFG_FILE 不存在"
-          exit 1
-        fi
-        echo "📥 使用配置: $CFG_FILE"
+        [ ! -f "$SRC" ] && echo "::error::$CFG_FILE 不存在" && exit 1
+
         cp -f "$SRC" openwrt/.config
 
-        # ★ 去后缀作设备名(x86_64.config → x86_64)
         DEVICE_NAME="${CFG_FILE%.*}"
-
-        # ★ 从 .config 解析真实 TARGET / PROFILE
         TARGET_BOARD=$(grep -E '^CONFIG_TARGET_BOARD=' openwrt/.config | cut -d'"' -f2)
-        TARGET_SUBTARGET=$(grep -E '^CONFIG_TARGET_SUBTARGET=' openwrt/.config | cut -d'"' -f2)
         TARGET_PROFILE=$(grep -E '^CONFIG_TARGET_PROFILE=' openwrt/.config | cut -d'"' -f2)
 
-        FINAL_DEVICE="${TARGET_PROFILE:-$DEVICE_NAME}"
-        BOARD="${TARGET_BOARD:-unknown}"
-
         echo "DEVICE_NAME=$DEVICE_NAME" >> $GITHUB_OUTPUT
-        echo "FINAL_DEVICE=$FINAL_DEVICE" >> $GITHUB_OUTPUT
-        echo "BOARD=$BOARD" >> $GITHUB_OUTPUT
-        echo "TARGET_PROFILE=$TARGET_PROFILE" >> $GITHUB_OUTPUT
-
-        echo "✔ DEVICE_NAME   : $DEVICE_NAME"
-        echo "✔ FINAL_DEVICE  : $FINAL_DEVICE"
-        echo "✔ TARGET_BOARD : $BOARD"
-        echo "✔ PROFILE       : $TARGET_PROFILE"
+        echo "FINAL_DEVICE=${TARGET_PROFILE:-$DEVICE_NAME}" >> $GITHUB_OUTPUT
 
     - name: 执行自定义脚本1
       run: |
@@ -303,7 +246,6 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    # ★ 原 "生成 .config" 保留，因 load_config 已拷贝
     - name: 生成 .config
       run: |
         cd openwrt
@@ -332,86 +274,45 @@ jobs:
         path: /builder/build_dir
         retention-days: 3
 
-    # ==================== ★ 整理固件（按设备分目录） ====================
-    - name: ★ 整理固件 — 按设备名归档 & 生成 firmware.list
+    # ==================== ★ 整理固件并上传 Artifact ====================
+    - name: ★ 整理固件 & 上传 Artifact
       if: steps.compile.outputs.status == 'success'
-      id: firm
-      run: |
-        DST="$GITHUB_WORKSPACE/firmware/${{ steps.load_config.outputs.DEVICE_NAME }}"
-        mkdir -p "$DST"
-        cp -r openwrt/bin/targets/*/*/*.bin openwrt/bin/targets/*/*/*.img* openwrt/bin/targets/*/*/*.gz "$DST"/ 2>/dev/null || true
-        rm -rf "$DST/packages"
-
-        # ★ 生成固件清单
-        ls -lh "$DST" > "$DST/firmware.list"
-        echo "FIRMWARE=$DST" >> $GITHUB_ENV
-        echo "firmware_dir=$DST" >> $GITHUB_OUTPUT
-
-    # ==================== 发布（统一，放 build job 外更优；此处做单 job 内兜底） ====================
-    # ★ 真正"全部完成后统一 Release" 推荐用单独 publish job
-    # 下面保留供单 job 模式使用，多 config 时每矩阵会上传自身 bin（GitHub 允许追加文件）
-
-    - name: 删除旧 Release
-      if: github.event.inputs.delete_last_release == 'true' && matrix.config == (fromJson(steps.collect_configs.outputs.CONFIG_LIST)[0])
-      uses: dev-drprasad/delete-older-releases@v0.3.0
+      uses: actions/upload-artifact@v4
       with:
-        keep_latest: 0
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: firmware-${{ matrix.config }}
+        path: |
+          openwrt/bin/targets/*/*/*.bin
+          openwrt/bin/targets/*/*/*.img*
+          openwrt/bin/targets/*/*/*.gz
+        retention-days: 3
 
-    - name: ★ 创建 / 追加 Release（每矩阵追加自身固件）
-      if: steps.compile.outputs.status == 'success'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ env.FILE_DATE }}
-        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_MultiDevice_${{ env.FILE_DATE }}
-        files: |
-          ${{ steps.firm.outputs.firmware_dir }}/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+# ==================== ★ 新增：统一 Release ====================
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
 
-    # ==================== 报表 ====================
-    - name: 编译统计
-      if: always()
-      run: |
-        END_TIME=$(date +%s)
-        DURATION=$((END_TIME - START_TIME))
-        MIN=$((DURATION / 60))
-        SEC=$((DURATION % 60))
+    steps:
+      - name: 删除旧 Release
+        if: github.event.inputs.delete_last_release == 'true'
+        uses: dev-drprasad/delete-older-releases@v0.3.0
+        with:
+          keep_latest: 0
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-        echo "## 📊 OpenWrt 编译报表" >> $GITHUB_STEP_SUMMARY
-        echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
-        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-        echo "| 配置文件 | ${{ matrix.config }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 路由器 | ${{ steps.load_config.outputs.BOARD }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| TARGET_PROFILE | ${{ steps.load_config.outputs.TARGET_PROFILE }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 源码 | ${{ github.event.inputs.source_repo }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 版本 | ${{ env.VERSION_TAG }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 配置标识 | ${{ steps.load_config.outputs.DEVICE_NAME }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| 构建缓存 | $( [ -d /builder/build_dir ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| ccache | $( [ -d /builder/ccache ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
-        echo "| 耗时 | ${MIN}m ${SEC}s |" >> $GITHUB_STEP_SUMMARY
+      - name: ★ 下载所有固件 Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: firmware
 
-    # ==================== 清理过期 Cache ====================
-    - name: 清理过期 Cache
-      if: always()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const caches = await github.rest.actions.getActionsCacheList({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            per_page: 100
-          });
-          const now = Date.now();
-          const maxAge = 7 * 24 * 60 * 60 * 1000;
-          for (const c of caches.data.actions_caches) {
-            if (now - new Date(c.created_at).getTime() > maxAge) {
-              await github.rest.actions.deleteActionsCacheByKey({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                key: c.key
-              });
-            }
-          }
+      - name: ★ 创建唯一 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.source_repo }}_${{ env.VERSION_TAG }}_${{ github.run_id }}
+          name: ${{ github.event.inputs.source_repo }}_${{ env.VERSION_TAG }}_全设备_${{ github.run_id }}
+          files: |
+            firmware/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
