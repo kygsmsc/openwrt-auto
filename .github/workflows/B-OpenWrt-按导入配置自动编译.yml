@@ -4,7 +4,7 @@
 # https://github.com/3wlh/Actions-OpenWrt
 # Description: OpenWrt 按配置编译固件（加载1号生成的配置参数 + 自动编译固件 + 发布固件）
 #============================================================================================
-name: 2.OpenWrt-按导入配置自动编译
+name: B-OpenWrt-按导入配置自动编译
 
 on:
   repository_dispatch:
