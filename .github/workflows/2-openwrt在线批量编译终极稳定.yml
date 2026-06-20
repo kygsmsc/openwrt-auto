@@ -337,7 +337,7 @@ jobs:
 
 
     # ==================== 清理过期 Cache ====================
-- name: 清理过期 Cache
+      - name: 清理过期 Cache
         if: always()
         uses: actions/github-script@v7
         with:
