@@ -179,10 +179,13 @@ jobs:
             echo "::error::未知 source_repo: $INPUT"
             exit 1 ;;
         esac
-
+        # ✅ 从 URL 提取仓库名（如 immortalwrt / openwrt / lede）
+        SOURCE_REPO_NAME=$(basename "$REPO_URL" .git)
+        
         echo "REPO_URL=$REPO_URL" >> $GITHUB_OUTPUT
         echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_OUTPUT
-
+        echo "SOURCE_REPO_NAME=$SOURCE_REPO_NAME" >> $GITHUB_OUTPUT
+        
         echo "🔍 校验远程分支: $REPO_BRANCH"
         if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
           echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
@@ -382,7 +385,7 @@ jobs:
         cat <<EOF > ${{ env.FIRMWARE }}/README.md
         # OpenWrt Firmware
 
-        - Project   : ${{ github.event.repository.name }}
+        - Project   : ${{ steps.repo.outputs.SOURCE_REPO_NAME }}
         - Version   : ${{ env.VERSION_TAG }}
         - Kernel    : ${{ steps.meta.outputs.KERNEL }}
         - Device    : ${{ steps.meta.outputs.BOARD }}
@@ -407,8 +410,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.event.repository.name }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
-        name: ${{ github.event.repository.name }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
+        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
+        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATE }}_${{ steps.meta.outputs.BUILD_TYPE }}
         files: |
           ${{ env.FIRMWARE }}/*
           ${{ env.FIRMWARE }}/README.md
