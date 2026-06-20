@@ -164,6 +164,12 @@ jobs:
         echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_OUTPUT
         echo "SOURCE_REPO_NAME=$SOURCE_REPO_NAME" >> $GITHUB_OUTPUT
 
+        echo "🔍 校验远程分支: $REPO_BRANCH"
+        if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
+          echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
+          exit 1
+        fi
+
     - name: 克隆源码并切换版本
       working-directory: /builder
       run: |
@@ -177,13 +183,24 @@ jobs:
         if [[ "$TAG_INPUT" == "latest" ]]; then
           echo "✅ 使用默认分支最新代码"
         elif [[ "$TAG_INPUT" =~ ^v[0-9] ]]; then
+          echo "📌 识别为版本 Tag: $TAG_INPUT"
           git fetch --tags
+          if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG_INPUT 不存在"
+            exit 1
+          fi
           git checkout -b build_$TAG_INPUT $TAG_INPUT
-        else
-          git fetch origin "$TAG_INPUT":"$TAG_INPUT"
-          git checkout "$TAG_INPUT"
-        fi
 
+        else
+          echo "📌 尝试切换为分支或 Tag: $TAG_INPUT"
+          git fetch --tags
+          if git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            git checkout -b build_$TAG_INPUT $TAG_INPUT
+          else
+            git fetch origin "$TAG_INPUT":"$TAG_INPUT"
+            git checkout "$TAG_INPUT"
+          fi
+        fi
     # ==================== 缓存 ====================
     - name: 缓存编译目录
       if: github.event.inputs.use_cache == 'true'
@@ -211,6 +228,19 @@ jobs:
           cp -f "$FEEDS_CONF" feeds.conf.default
         fi
 
+    - name: 执行自定义脚本1
+      run: |
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+
+    - name: 更新 feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
     # ★ 加载当前矩阵配置 & 解析设备信息
     - name: ★ 加载当前矩阵配置 & 解析设备信息
       id: load_config
@@ -227,18 +257,6 @@ jobs:
 
         echo "DEVICE_NAME=$DEVICE_NAME" >> $GITHUB_OUTPUT
         echo "FINAL_DEVICE=${TARGET_PROFILE:-$DEVICE_NAME}" >> $GITHUB_OUTPUT
-
-    - name: 执行自定义脚本1
-      run: |
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
-
-    - name: 更新 feeds
-      run: |
-        cd openwrt
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
 
     - name: 执行自定义脚本2
       run: |
@@ -316,3 +334,27 @@ jobs:
             firmware/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+    # ==================== 清理过期 Cache ====================
+      - name: 清理过期 Cache
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const caches = await github.rest.actions.getActionsCacheList({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+          const now = Date.now();
+          const maxAge = 7 * 24 * 60 * 60 * 1000;
+          for (const c of caches.data.actions_caches) {
+            if (now - new Date(c.created_at).getTime() > maxAge) {
+              await github.rest.actions.deleteActionsCacheByKey({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                key: c.key
+              });
+            }
+          }
