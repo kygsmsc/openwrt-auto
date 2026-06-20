@@ -334,29 +334,3 @@ jobs:
             firmware/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-    # ==================== 清理过期 Cache ====================
-      - name: 清理过期 Cache
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const caches = await github.rest.actions.getActionsCacheList({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100
-            });
-
-            const now = Date.now();
-            const maxAge = 7 * 24 * 60 * 60 * 1000;
-
-            for (const c of caches.data.actions_caches || []) {
-              if (now - new Date(c.created_at).getTime() > maxAge) {
-                await github.rest.actions.deleteActionsCacheByKey({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  key: c.key
-                });
-              }
-            }
