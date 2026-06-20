@@ -412,8 +412,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         
-        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATETIME }}
-        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.BOARD }}_${{ steps.meta.outputs.KERNEL }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATETIME }}
+        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATETIME }}
+        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ steps.meta.outputs.CFG_NAME }}_${{ env.FILE_DATETIME }}
         files: |
           ${{ env.FIRMWARE }}/*
     
