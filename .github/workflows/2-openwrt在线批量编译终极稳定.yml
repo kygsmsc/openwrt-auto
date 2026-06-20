@@ -311,6 +311,12 @@ jobs:
     if: always()
 
     steps:
+    
+      - name: 生成日期时间
+        id: set_time
+        run: |
+          echo "DATETIME=$(date +%Y.%m.%d-%H%M)" >> $GITHUB_OUTPUT
+    
       - name: 删除旧 Release
         if: github.event.inputs.delete_last_release == 'true'
         uses: dev-drprasad/delete-older-releases@v0.3.0
@@ -328,8 +334,8 @@ jobs:
       - name: ★ 创建唯一 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.source_repo }}_${{ env.VERSION_TAG }}_${{ github.run_id }}
-          name: ${{ github.event.inputs.source_repo }}_${{ env.VERSION_TAG }}_全设备_${{ github.run_id }}
+          tag_name: ${{ github.event.inputs.source_repo }}_${{ env.VERSION_TAG }}_${{ steps.set_time.outputs.DATETIME }}
+          name: ${{ github.event.inputs.source_repo }}_${{ env.VERSION_TAG }}_全设备_${{ steps.set_time.outputs.DATETIME }}
           files: |
             firmware/**/*
         env:
