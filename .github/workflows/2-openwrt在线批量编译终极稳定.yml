@@ -1,0 +1,417 @@
+name: 2-openwrt在线批量编译终极稳定
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo:
+        description: "选择 OpenWrt 源码仓库"
+        required: true
+        default: "kygs-immortalwrt-master"
+        type: choice
+        options:
+          - lede-master
+          - openwrt-main
+          - openwrt-24.10
+          - openwrt-23.05
+          - immortalwrt-master
+          - immortalwrt-24.10
+          - istoreos-master
+          - kygs-immortalwrt-master
+          - kygs-istoreos-24.10
+
+      version_tag:
+        description: "选择源码版本（latest / 分支名 / Tag）"
+        required: true
+        default: "latest"
+        type: choice
+        options:
+          - latest
+          - openwrt-24.10
+          - v24.10.1
+          - v23.05.0
+          - v23.05.1
+          - v23.05.2
+          - v23.05.3
+          - v23.05.4
+
+      delete_last_release:
+        description: "是否删除上一个 Release"
+        required: false
+        default: "false"
+        type: boolean
+
+      use_cache:
+        description: "是否使用编译缓存"
+        required: false
+        default: "true"
+        type: boolean
+
+      # ★ 原 device 输入保留但不再使用（仅供回溯）
+      # device:
+      #   description: "（已废弃）原手动指定设备标识"
+      #   required: false
+      #   default: "x86_64"
+      #   type: string
+
+env:
+  FEEDS_CONF: feeds.conf.default
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
+  CONFIG_CCACHE: y
+  CCACHE_DIR: /builder/ccache
+  VERSION_TAG: ${{ github.event.inputs.version_tag }}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    # ★ 动态矩阵：由 set-matrix job 或 collect_configs step 注入
+    # 此处先写固定占位，实际由下方 steps.collect_configs.outputs.CONFIG_LIST 驱动
+    strategy:
+      fail-fast: false   # ★ 单 config 失败不影响其余
+      matrix:
+        config: ${{ fromJson(needs.set_matrix.outputs.config_list || '["dummy"]') }}
+    # 注：若你不想拆 set_matrix job，可直接用下面单行替代上面 matrix（二选一）：
+    # matrix:
+    #   config:
+    #     - x86_64.config
+    #     - r4s.config
+    # 推荐做法见下方 ★ 新增 set_matrix job（已附在文末）
+
+    env:
+      DEVICE: ${{ matrix.config }}
+
+    steps:
+    - name: 记录开始时间
+      run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+    - name: 检出仓库
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: true
+
+    # ==================== ★ 新增：收集所有 *.config ====================
+    - name: ★ 收集所有设备配置(.config)
+      id: collect_configs
+      run: |
+        echo "🔍 扫描仓库根目录 *.config ..."
+        FILES=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -name '*.config' -printf '%f\n')
+        if [ -z "$FILES" ]; then
+          echo "::error::仓库根目录未找到任何 *.config 文件"
+          exit 1
+        fi
+        echo "$FILES" | tee config_list.txt
+        # 转 JSON 数组供 matrix（若拆 set_matrix job 用）
+        echo "CONFIG_LIST=$(echo "$FILES" | jq -R -s 'split("\n")|map(select(length>0))')" >> $GITHUB_OUTPUT
+
+    # ==================== 基础环境 ====================
+    - name: 安装编译依赖
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -qq install build-essential ccache cmake flex bison gawk \
+          gcc-multilib g++-multilib libncurses5-dev python3 git wget curl zip unzip \
+          bzip2 p7zip-full rsync file gettext libssl-dev libelf-dev autopoint libtool-bin perl jq
+        sudo apt-get -qq autoremove -y
+        sudo apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /builder
+        sudo chown $USER:$GROUPS /builder
+        ccache -M 10G
+
+    # ==================== 源码 ====================
+    - name: 解析源码仓库
+      id: repo
+      run: |
+        INPUT="${{ github.event.inputs.source_repo }}"
+        echo "DEBUG source_repo=[$INPUT]"
+
+        case "$INPUT" in
+          lede-master)
+            REPO_URL=https://github.com/coolsnowwolf/lede
+            REPO_BRANCH=master ;;
+          openwrt-main)
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=main ;;
+          openwrt-24.10)
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=openwrt-24.10 ;;
+          openwrt-23.05)
+            REPO_URL=https://github.com/openwrt/openwrt
+            REPO_BRANCH=openwrt-23.05 ;;
+          immortalwrt-master)
+            REPO_URL=https://github.com/immortalwrt/immortalwrt
+            REPO_BRANCH=master ;;
+          immortalwrt-24.10)
+            REPO_URL=https://github.com/immortalwrt/immortalwrt
+            REPO_BRANCH=openwrt-24.10 ;;
+          istoreos-master)
+            REPO_URL=https://github.com/istoreos/istoreos
+            REPO_BRANCH=main ;;
+          kygs-immortalwrt-master)
+            REPO_URL=https://github.com/kygsmsc/immortalwrt
+            REPO_BRANCH=master ;;
+          kygs-istoreos-24.10)
+            REPO_URL=https://github.com/kygsmsc/istoreos
+            REPO_BRANCH=istoreos-24.10 ;;
+          *)
+            echo "::error::未知 source_repo: $INPUT"
+            exit 1 ;;
+        esac
+        SOURCE_REPO_NAME=$(basename "$REPO_URL" .git)
+
+        echo "REPO_URL=$REPO_URL" >> $GITHUB_OUTPUT
+        echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_OUTPUT
+        echo "SOURCE_REPO_NAME=$SOURCE_REPO_NAME" >> $GITHUB_OUTPUT
+
+        echo "🔍 校验远程分支: $REPO_BRANCH"
+        if ! git ls-remote --heads "$REPO_URL" | grep -q "refs/heads/$REPO_BRANCH"; then
+          echo "::error::$REPO_URL 不存在分支 $REPO_BRANCH"
+          exit 1
+        fi
+
+    - name: 克隆源码并切换版本
+      working-directory: /builder
+      run: |
+        rm -rf openwrt
+        git clone -b ${{ steps.repo.outputs.REPO_BRANCH }} \
+          ${{ steps.repo.outputs.REPO_URL }} openwrt
+
+        ln -sf /builder/openwrt $GITHUB_WORKSPACE/openwrt
+        cd openwrt
+
+        TAG_INPUT="${{ env.VERSION_TAG }}"
+
+        if [[ "$TAG_INPUT" == "latest" ]]; then
+          echo "✅ 使用默认分支最新代码"
+        elif [[ "$TAG_INPUT" =~ ^v[0-9] ]]; then
+          echo "📌 识别为版本 Tag: $TAG_INPUT"
+          git fetch --tags
+          if ! git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG_INPUT 不存在"
+            exit 1
+          fi
+          git checkout -b build_$TAG_INPUT $TAG_INPUT
+        else
+          echo "📌 尝试切换为分支或 Tag: $TAG_INPUT"
+          git fetch --tags
+          if git rev-parse "tags/$TAG_INPUT" >/dev/null 2>&1; then
+            git checkout -b build_$TAG_INPUT $TAG_INPUT
+          else
+            git fetch origin "$TAG_INPUT":"$TAG_INPUT"
+            git checkout "$TAG_INPUT"
+          fi
+        fi
+
+    # ==================== 缓存 ====================
+    - name: 缓存编译目录
+      if: github.event.inputs.use_cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          /builder/dl
+          /builder/build_dir
+          /builder/staging_dir
+        key: openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}-${{ hashFiles(format('{0}', matrix.config)) }}
+        restore-keys: |
+          openwrt-${{ github.event.inputs.source_repo }}-${{ env.VERSION_TAG }}-${{ matrix.config }}-
+
+    - name: 清理缓存（禁用缓存时）
+      if: github.event.inputs.use_cache == 'false'
+      run: |
+        sudo rm -rf /builder/dl /builder/build_dir /builder/staging_dir
+        ccache -C
+
+    # ==================== Feeds & 自定义脚本 ====================
+    - name: 加载 feeds 配置
+      run: |
+        cd openwrt
+        if [[ -f "$FEEDS_CONF" && "$FEEDS_CONF" != "feeds.conf.default" ]]; then
+          cp -f "$FEEDS_CONF" feeds.conf.default
+        fi
+
+    # ★ 原加载设备配置（已注释，不删除）───────────────────────────────
+    # - name: 加载设备配置
+    #   id: load_config
+    #   run: |
+    #     CFG="${{ github.event.inputs.config_save_path }}.${DEVICE}"
+    #     if [ -f "$CFG" ]; then
+    #       cp -f "$CFG" openwrt/.config
+    #       echo "CONFIG_TYPE=device" >> $GITHUB_OUTPUT
+    #     elif [ -f "${{ github.event.inputs.config_save_path }}" ]; then
+    #       cp -f "${{ github.event.inputs.config_save_path }}" openwrt/.config
+    #       echo "CONFIG_TYPE=default" >> $GITHUB_OUTPUT
+    #     else
+    #       echo "::error::未找到配置文件"
+    #       exit 1
+    #     fi
+    # ────────────────────────────────────────────────────────────────
+
+    # ★ 新增：按矩阵加载当前 .config 并解析 TARGET_DEVICE / BOARD / PROFILE
+    - name: ★ 加载当前矩阵配置 & 解析设备信息
+      id: load_config
+      run: |
+        CFG_FILE="${{ matrix.config }}"
+        SRC="$GITHUB_WORKSPACE/$CFG_FILE"
+        if [ ! -f "$SRC" ]; then
+          echo "::error::配置文件 $CFG_FILE 不存在"
+          exit 1
+        fi
+        echo "📥 使用配置: $CFG_FILE"
+        cp -f "$SRC" openwrt/.config
+
+        # ★ 去后缀作设备名(x86_64.config → x86_64)
+        DEVICE_NAME="${CFG_FILE%.*}"
+
+        # ★ 从 .config 解析真实 TARGET / PROFILE
+        TARGET_BOARD=$(grep -E '^CONFIG_TARGET_BOARD=' openwrt/.config | cut -d'"' -f2)
+        TARGET_SUBTARGET=$(grep -E '^CONFIG_TARGET_SUBTARGET=' openwrt/.config | cut -d'"' -f2)
+        TARGET_PROFILE=$(grep -E '^CONFIG_TARGET_PROFILE=' openwrt/.config | cut -d'"' -f2)
+
+        FINAL_DEVICE="${TARGET_PROFILE:-$DEVICE_NAME}"
+        BOARD="${TARGET_BOARD:-unknown}"
+
+        echo "DEVICE_NAME=$DEVICE_NAME" >> $GITHUB_OUTPUT
+        echo "FINAL_DEVICE=$FINAL_DEVICE" >> $GITHUB_OUTPUT
+        echo "BOARD=$BOARD" >> $GITHUB_OUTPUT
+        echo "TARGET_PROFILE=$TARGET_PROFILE" >> $GITHUB_OUTPUT
+
+        echo "✔ DEVICE_NAME   : $DEVICE_NAME"
+        echo "✔ FINAL_DEVICE  : $FINAL_DEVICE"
+        echo "✔ TARGET_BOARD : $BOARD"
+        echo "✔ PROFILE       : $TARGET_PROFILE"
+
+    - name: 执行自定义脚本1
+      run: |
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新 feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 执行自定义脚本2
+      run: |
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    # ★ 原 "生成 .config" 保留，因 load_config 已拷贝
+    - name: 生成 .config
+      run: |
+        cd openwrt
+        make defconfig
+        echo "FILE_DATE=$(date +%Y.%m.%d)" >> $GITHUB_ENV
+
+    # ==================== 编译 ====================
+    - name: 下载依赖
+      run: |
+        cd openwrt
+        make download -j$(nproc)
+        find dl -size -1024c -delete
+
+    - name: 编译固件
+      id: compile
+      run: |
+        cd openwrt
+        make -j$(nproc) V=w
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 失败时上传 build_dir
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build_dir_${{ matrix.config }}
+        path: /builder/build_dir
+        retention-days: 3
+
+    # ==================== ★ 整理固件（按设备分目录） ====================
+    - name: ★ 整理固件 — 按设备名归档 & 生成 firmware.list
+      if: steps.compile.outputs.status == 'success'
+      id: firm
+      run: |
+        DST="$GITHUB_WORKSPACE/firmware/${{ steps.load_config.outputs.DEVICE_NAME }}"
+        mkdir -p "$DST"
+        cp -r openwrt/bin/targets/*/*/*.bin openwrt/bin/targets/*/*/*.img* openwrt/bin/targets/*/*/*.gz "$DST"/ 2>/dev/null || true
+        rm -rf "$DST/packages"
+
+        # ★ 生成固件清单
+        ls -lh "$DST" > "$DST/firmware.list"
+        echo "FIRMWARE=$DST" >> $GITHUB_ENV
+        echo "firmware_dir=$DST" >> $GITHUB_OUTPUT
+
+    # ==================== 发布（统一，放 build job 外更优；此处做单 job 内兜底） ====================
+    # ★ 真正"全部完成后统一 Release" 推荐用单独 publish job
+    # 下面保留供单 job 模式使用，多 config 时每矩阵会上传自身 bin（GitHub 允许追加文件）
+
+    - name: 删除旧 Release
+      if: github.event.inputs.delete_last_release == 'true' && matrix.config == (fromJson(steps.collect_configs.outputs.CONFIG_LIST)[0])
+      uses: dev-drprasad/delete-older-releases@v0.3.0
+      with:
+        keep_latest: 0
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: ★ 创建 / 追加 Release（每矩阵追加自身固件）
+      if: steps.compile.outputs.status == 'success'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_${{ env.FILE_DATE }}
+        name: ${{ steps.repo.outputs.SOURCE_REPO_NAME }}_${{ env.VERSION_TAG }}_MultiDevice_${{ env.FILE_DATE }}
+        files: |
+          ${{ steps.firm.outputs.firmware_dir }}/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # ==================== 报表 ====================
+    - name: 编译统计
+      if: always()
+      run: |
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        MIN=$((DURATION / 60))
+        SEC=$((DURATION % 60))
+
+        echo "## 📊 OpenWrt 编译报表" >> $GITHUB_STEP_SUMMARY
+        echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| 配置文件 | ${{ matrix.config }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 路由器 | ${{ steps.load_config.outputs.BOARD }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| TARGET_PROFILE | ${{ steps.load_config.outputs.TARGET_PROFILE }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 源码 | ${{ github.event.inputs.source_repo }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 版本 | ${{ env.VERSION_TAG }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 配置标识 | ${{ steps.load_config.outputs.DEVICE_NAME }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 构建缓存 | $( [ -d /builder/build_dir ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| ccache | $( [ -d /builder/ccache ] && echo '✅ HIT' || echo '❌ MISS' ) |" >> $GITHUB_STEP_SUMMARY
+        echo "| 耗时 | ${MIN}m ${SEC}s |" >> $GITHUB_STEP_SUMMARY
+
+    # ==================== 清理过期 Cache ====================
+    - name: 清理过期 Cache
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const caches = await github.rest.actions.getActionsCacheList({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+          const now = Date.now();
+          const maxAge = 7 * 24 * 60 * 60 * 1000;
+          for (const c of caches.data.actions_caches) {
+            if (now - new Date(c.created_at).getTime() > maxAge) {
+              await github.rest.actions.deleteActionsCacheByKey({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                key: c.key
+              });
+            }
+          }
