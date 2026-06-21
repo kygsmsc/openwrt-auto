@@ -41,7 +41,7 @@ on:
       ssh:
         description: "启用 SSH 连接（安全模式）"
         required: false
-        default: false
+        default: true
         type: boolean
 
       ssh_timeout:
