@@ -38,6 +38,17 @@ on:
           - v23.05.3
           - v23.05.4
 
+version_tag:
+  description: |
+    源码版本（可手输）：
+    - latest
+    - openwrt-24.10
+    - v24.10.1
+    - v23.05.0 ~ v23.05.4
+  required: true
+  default: "latest"
+  type: string
+
       ssh:
         description: "启用 SSH 连接（可在线 make menuconfig）"
         required: false
