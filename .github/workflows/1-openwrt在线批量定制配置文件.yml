@@ -25,16 +25,21 @@ on:
 
 
 
-version_tag:
-  description: |
-    源码版本（可手输）：
-    - latest
-    - openwrt-24.10
-    - v24.10.1
-    - v23.05.0 ~ v23.05.4
-  required: true
-  default: "latest"
-  type: string
+      version_tag:
+        description: "选择源码版本（latest / 分支名 / Tag）"
+        required: true
+        default: "latest"
+        type: choice
+        options:
+          - latest
+          - openwrt-25.12
+          - openwrt-24.10
+          - openwrt-18.06
+          - openwrt-18.06k-5.4
+          - v23.05.1
+          - v23.05.2
+          - v23.05.3
+          - v23.05.4
 
       ssh:
         description: "启用 SSH 连接（可在线 make menuconfig）"
