@@ -44,9 +44,10 @@ on:
         type: choice
         options:
           - latest
+          - openwrt-25.12
           - openwrt-24.10
-          - v24.10.1
-          - v23.05.0
+          - openwrt-18.06
+          - openwrt-18.06k-5.4
           - v23.05.1
           - v23.05.2
           - v23.05.3
