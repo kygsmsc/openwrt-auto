@@ -39,7 +39,7 @@ on:
           - v23.05.4
 
       ssh:
-        description: "启用 SSH 连接（安全模式）"
+        description: "启用 SSH 连接（可在线 make menuconfig）"
         required: false
         default: true
         type: boolean
