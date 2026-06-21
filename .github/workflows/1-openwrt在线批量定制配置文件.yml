@@ -195,6 +195,17 @@ jobs:
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+        
+    - name: 加载 .config 配置
+      run: |
+        cd openwrt
+        if [ -f "../$CONFIG_FILE" ]; then
+          echo "✅ 检测到自定义 .config，正在加载..."
+          cp -f "../$CONFIG_FILE" .config
+        else
+          echo "ℹ️ 未检测到自定义 .config，将使用 OpenWrt 默认配置"
+        fi
+
 
     - name: 执行自定义脚本2
       run: |
