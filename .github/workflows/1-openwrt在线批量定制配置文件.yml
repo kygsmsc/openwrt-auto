@@ -23,20 +23,7 @@ on:
           - kygs-immortalwrt-master
           - kygs-istoreos-24.10
 
-      version_tag:
-        description: "选择源码版本（latest / 分支名 / Tag）"
-        required: true
-        default: "latest"
-        type: choice
-        options:
-          - latest
-          - openwrt-24.10
-          - v24.10.1
-          - v23.05.0
-          - v23.05.1
-          - v23.05.2
-          - v23.05.3
-          - v23.05.4
+
 
 version_tag:
   description: |
