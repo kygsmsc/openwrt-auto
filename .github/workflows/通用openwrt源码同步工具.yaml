@@ -1,4 +1,4 @@
-name: 通用源码同步工具
+name: 通用openwrt源码同步工具
 run-name: 同步 ${{ github.event.inputs.source_repo }} 分支 ${{ github.event.inputs.target_ver }}
 on:
   workflow_dispatch:
