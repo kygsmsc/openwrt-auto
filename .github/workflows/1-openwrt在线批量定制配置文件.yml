@@ -214,7 +214,7 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     # ==================== SSH 安全模式 ====================
-    - name: SSH 远程连接（安全模式）
+    - name: SSH 远程连接（可在线 make menuconfig）
       if: github.event.inputs.ssh == 'true'
       uses: rdp-studio/ssh2actions@main
       timeout-minutes: ${{ fromJSON(github.event.inputs.ssh_timeout) }}
