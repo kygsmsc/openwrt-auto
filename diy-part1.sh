@@ -61,3 +61,17 @@
 # git branch
 # git checkout v23.05.4 #在tag里有版本号，填入你要的版本号，我选我现在最新的v23.05.4
 
+# 添加 iStore 商店软件源
+# ===============================================
+echo ">>> [part1] 添加 iStore 软件源"
+echo >> feeds.conf.default
+echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+
+# 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
+# （workflow 里后面还会再 update -a，这里先装也行，保险点等 part2 后由 workflow 统一装也 ok）
+# 推荐：part1 只改 feeds.conf，install 交给 workflow 的 ./scripts/feeds install -a
+# 但如果 workflow 里没单独 install luci-app-store，就在这里装：
+./scripts/feeds update istore
+./scripts/feeds install -p istore luci-app-store
+
+echo ">>> [part1] 完成"
