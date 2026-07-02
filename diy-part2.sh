@@ -80,17 +80,17 @@ git clone --depth=1 https://github.com/wukongdaily/luci-app-run.git package/luci
 
 echo ">>> [part2] 完成"
 # -------- iStore --------
-echo 'CONFIG_PACKAGE_luci-app-store=y' >> .config
-echo 'CONFIG_PACKAGE_luci-theme-istore=y' >> .config
+echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config
+echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config
 
 # -------- luci-app-run --------
-echo 'CONFIG_PACKAGE_luci-app-run=y' >> .config
+echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 
 # -------- Docker --------
-echo 'CONFIG_PACKAGE_docker=y' >> .config
-echo 'CONFIG_PACKAGE_dockerd=y' >> .config
-echo 'CONFIG_PACKAGE_luci-app-dockerman=y' >> .config
-echo 'CONFIG_PACKAGE_luci-lib-docker=y' >> .config
+echo 'CONFIG_PACKAGE_docker=y' >>.config
+echo 'CONFIG_PACKAGE_dockerd=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-dockerman=y' >>.config
+echo 'CONFIG_PACKAGE_luci-lib-docker=y' >>.config
 
 #if [ $delete_bootstrap ]; then
 #  echo "去除默认bootstrap主题"
