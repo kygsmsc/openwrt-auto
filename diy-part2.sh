@@ -64,6 +64,13 @@ sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='$utc_name'/g" packa
 #echo "修改默认主题"
 #sed -i "s/bootstrap/$default_theme/g" feeds/luci/modules/luci-base/root/etc/config/luci
 
+# ---------- 新增：luci-app-run ----------
+echo ">>> 添加 luci-app-run"
+rm -rf package/luci-app-run
+git clone --depth=1 https://github.com/wukongdaily/luci-app-run.git package/luci-app-run
+echo "DIY2 完成"
+echo 'CONFIG_PACKAGE_luci-app-run=y' >> .config
+
 #if [ $delete_bootstrap ]; then
 #  echo "去除默认bootstrap主题"
 #  sed -i '/\+luci-theme-bootstrap/d' feeds/luci/collections/luci/Makefile
