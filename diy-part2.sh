@@ -67,9 +67,9 @@ sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='$utc_name'/g" packa
 # ===============================================
 # 添加 luci-theme-istore（iStoreOS 蓝白主题）
 # ===============================================
-echo ">>> [part2] 添加 luci-theme-istore"
-rm -rf package/luci-theme-istore
-git clone --depth=1 https://github.com/jerrykuku/luci-theme-istore.git package/luci-theme-istore
+echo ">>> [part2] 添加 luci-theme-argon"
+rm -rf package/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
 # ===============================================
 # 添加 luci-app-run（悟空Daily）
