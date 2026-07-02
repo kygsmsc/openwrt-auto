@@ -27,7 +27,7 @@ jobs:
       SOURCE_KEY: ${{ github.event.inputs.source_repo }}
       TARGET_VER: ${{ github.event.inputs.target_ver }}
 
-      # 映射上游仓库地址 & 个人目标仓库名
+      # 上游仓库地址
       UPSTREAM_LED_MASTER: https://github.com/coolsnowwolf/lede.git
       UPSTREAM_OPENWRT_MAIN: https://github.com/openwrt/openwrt.git
       UPSTREAM_IMM_MASTER: https://github.com/immortalwrt/immortalwrt.git
@@ -39,9 +39,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ===============================
+      # ============================================
       # 1. 解析上游仓库与目标仓库信息
-      # ===============================
+      # ============================================
       - name: 解析上游仓库与目标仓库名称
         id: parse_env
         run: |
@@ -94,9 +94,9 @@ jobs:
           echo "✅ 上游地址 : $UPSTREAM_URL"
           echo "✅ 同步分支 : $UPSTREAM_BRANCH"
 
-      # ===============================
+      # ============================================
       # 2. 克隆个人目标仓库
-      # ===============================
+      # ============================================
       - name: 克隆个人目标仓库
         run: |
           set -euo pipefail
@@ -106,20 +106,18 @@ jobs:
           cd target-repo
           git remote -v
 
-      # ===============================
+      # ============================================
       # 3. Git 全局配置
-      # ===============================
+      # ============================================
       - name: 配置 Git 用户与凭证
         run: |
           cd target-repo
           git config user.name "kygsmsc"
           git config user.email "kygs1@163.com"
-          git config --global credential.helper '!f() { echo "username=kygsmsc"; echo "password=${{ secrets.PUSH_TOKEN }}"; }; f'
 
-
-      # ===============================
-      # 4. 添加上游并拉取
-      # ===============================
+      # ============================================
+      # 4. 添加上游并拉取代码
+      # ============================================
       - name: 添加上游官方源并拉取代码
         run: |
           set -euo pipefail
@@ -128,15 +126,15 @@ jobs:
           git remote add upstream ${{ env.UPSTREAM_URL }}
           git fetch upstream --tags
 
-      # ===============================
-      # 5. 同步分支（核心逻辑）
-      # ===============================
+      # ============================================
+      # 5. 同步上游分支并推送到个人仓库（✅ 已修复）
+      # ============================================
       - name: 同步上游分支并推送到个人仓库
         run: |
           set -euo pipefail
           cd target-repo
 
-          # 判断远程分支是否存在
+          # 判断远程分支是否已存在
           if git show-ref --verify --quiet refs/remotes/origin/${{ env.LOCAL_BRANCH }}; then
             echo "🔄 本地分支已存在，切换到已有分支"
             git checkout ${{ env.LOCAL_BRANCH }}
@@ -145,15 +143,18 @@ jobs:
             git checkout -b ${{ env.LOCAL_BRANCH }} upstream/${{ env.UPSTREAM_BRANCH }}
           fi
 
-          # 合并上游（不自动提交，方便人工干预）
-          git merge upstream/${{ env.UPSTREAM_BRANCH }} \
-              --no-edit \
-              --allow-unrelated-histories || true
+          # 合并上游（不使用 || true，确保失败立即中断）
+          git merge \
+            --no-edit \
+            --allow-unrelated-histories \
+            upstream/${{ env.UPSTREAM_BRANCH }}
 
-          # 推送（安全强制推送）
+          # ✅ 强制指定 refs/heads/
+          # 解决 iStoreOS 等仓库中 branch 与 tag 同名导致的：
+          # error: src refspec xxx matches more than one
           git push \
             https://${{ secrets.PUSH_TOKEN }}@github.com/kygsmsc/${{ env.TARGET_REPO_NAME }}.git \
-            ${{ env.LOCAL_BRANCH }} \
+            refs/heads/${{ env.LOCAL_BRANCH }}:refs/heads/${{ env.LOCAL_BRANCH }} \
             --force-with-lease
 
           echo "✅ 同步完成：${{ env.UPSTREAM_BRANCH }} → kygsmsc/${{ env.TARGET_REPO_NAME }}:${{ env.LOCAL_BRANCH }}"
