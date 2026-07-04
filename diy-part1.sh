@@ -66,6 +66,7 @@
 echo ">>> [part1] 添加 iStore 软件源"
 echo >> feeds.conf.default
 echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+echo 'src-git linkease https://github.com/linkease/openwrt-packages;main' >> feeds.conf.default
 
 # 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
 # （workflow 里后面还会再 update -a，这里先装也行，保险点等 part2 后由 workflow 统一装也 ok）
