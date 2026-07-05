@@ -89,6 +89,17 @@ echo 'CONFIG_PACKAGE_app-meta-istorex=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config
 echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config
 echo 'CONFIG_PACKAGE_luci-app-istoreos-upgrade=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-design-config=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-diskman=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-partexp=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-linkease=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-ddnsto=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-dockerman=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-ttyd=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-samba4=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-upnp=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-wol=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-filetransfer=y' >>.config
 
 # 主题（iStoreOS 官方紫调 Argon）
 # echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config
