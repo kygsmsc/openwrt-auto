@@ -80,9 +80,6 @@ FEEDS_CONF="feeds.conf.default"
 grep -q 'src-git istore' "$FEEDS_CONF" \
   || echo 'src-git istore https://github.com/linkease/istore;main' >> "$FEEDS_CONF"
 
-grep -q 'src-git linkease' "$FEEDS_CONF" \
-  || echo 'src-git linkease https://github.com/linkease/openwrt-packages;main' >> "$FEEDS_CONF"
-
 
 # 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
 # （workflow 里后面还会再 update -a，这里先装也行，保险点等 part2 后由 workflow 统一装也 ok）
