@@ -10,9 +10,14 @@
 # Description: OpenWrt DIY script part 1 (Before Update feeds)
 #
 
-# Uncomment a feed source
-#sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
-
+# ==================解开helloworld feed （ssr-plus来源关键）==============
+sed -i 's/^#\(src-git helloworld\)/\1/' feeds.conf.default
+# 如果上面那行没匹配到（有些分支 feeds.conf.default 里干脆没这行），就直接追加：
+# grep -q 'helloworld' feeds.conf.default || \
+# echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
+./scripts/feeds update helloworld
+./scripts/feeds install -a -p helloworld
+# ========================================================================
 #添加自定义插件链接（自己想要什么就github里面搜索然后添加）
 #rm -rf ./package/lean/luci-theme-argon && git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git package/lean/luci-theme-argon  #新的argon主题
 #git clone https://github.com/jerrykuku/luci-app-argon-config package/lean/luci-app-argon-config  #argon主题设置（编译时候选上,在固件的‘系统’里面）
