@@ -78,6 +78,7 @@ echo 'src-git linkease https://github.com/linkease/openwrt-packages;main' >> fee
 # 推荐：part1 只改 feeds.conf，install 交给 workflow 的 ./scripts/feeds install -a
 # 但如果 workflow 里没单独 install luci-app-store，就在这里装：
 ./scripts/feeds update istore
+./scripts/feeds update linkease
 ./scripts/feeds install -p istore luci-app-store
 
 echo ">>> [part1] 完成"
