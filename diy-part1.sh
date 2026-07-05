@@ -68,11 +68,22 @@ sed -i 's/^#\(src-git helloworld\)/\1/' feeds.conf.default
 
 # 添加 iStore 商店软件源
 # ===============================================
-echo ">>> [part1] 添加 iStore 软件源"
-grep -q 'src-git istore' feeds.conf.default \
-  || echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
-grep -q 'src-git linkease' feeds.conf.default \
-  || echo 'src-git linkease https://github.com/linkease/openwrt-packages;main' >> feeds.conf.default
+#!/bin/bash
+set -e
+
+echo ">>> [part1] 添加 iStore / linkease 软件源"
+
+cd openwrt
+
+FEEDS_CONF="feeds.conf.default"
+
+grep -q 'src-git istore' "$FEEDS_CONF" \
+  || echo 'src-git istore https://github.com/linkease/istore;main' >> "$FEEDS_CONF"
+
+grep -q 'src-git linkease' "$FEEDS_CONF" \
+  || echo 'src-git linkease https://github.com/linkease/openwrt-packages;main' >> "$FEEDS_CONF"
+
+
 # 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
 # （workflow 里后面还会再 update -a，这里先装也行，保险点等 part2 后由 workflow 统一装也 ok）
 # 推荐：part1 只改 feeds.conf，install 交给 workflow 的 ./scripts/feeds install -a
