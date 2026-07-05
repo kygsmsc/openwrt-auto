@@ -74,10 +74,17 @@ echo ">>> [part1] 添加 iStore 软件源"
 grep -q 'src-git istore' feeds.conf.default \
   || echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
 
+grep -q 'src-git nas' feeds.conf.default \
+  || echo 'src-git nas https://github.com/linkease/nas-packages;master' >> feeds.conf.default
+grep -q 'src-git nas_luci' feeds.conf.default \
+  || echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci;main' >> feeds.conf.default
+
 # 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
 # （workflow 里后面还会再 update -a，这里先装也行，保险点等 part2 后由 workflow 统一装也 ok）
 # 推荐：part1 只改 feeds.conf，install 交给 workflow 的 ./scripts/feeds install -a
 # 但如果 workflow 里没单独 install luci-app-store，就在这里装：
-./scripts/feeds update istore
-./scripts/feeds install -p istore luci-app-store
+./scripts/feeds update istore nas nas_luci
+./scripts/feeds install -a -p istore
+./scripts/feeds install -a -p nas
+./scripts/feeds install -a -p nas_luci
 echo ">>> [part1] 完成"
