@@ -80,10 +80,40 @@ git clone --depth=1 https://github.com/wukongdaily/luci-app-run.git package/luci
 
 echo ">>> [part2] 完成"
 # -------- iStore --------
-# echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config
 
-# -------- luci-app-run --------
+# iStoreOS 特色功能核心包
+echo 'CONFIG_PACKAGE_luci-app-quickstart=y' >>.config
+echo 'CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-istorex=y' >>.config
+echo 'CONFIG_PACKAGE_app-meta-istorex=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config
+echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-istoreos-upgrade=y' >>.config
+
+# 主题（iStoreOS 官方紫调 Argon）
+# echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-argon-config=y' >>.config
+# echo 'CONFIG_LUCI_LANG_zh_Hans=y' >>.config
+
+# quickstart 依赖的 iptables / 内核模块（ImmortalWrt 24.10 是 nftables 底，按需）
+echo 'CONFIG_PACKAGE_iptables-nft-compat=y' >>.config
+
+# 1. 默认主题切 Argon
+# uci set luci.main.mediaurlbase='/luci-static/argon'
+# uci set luci.main.lang='zh_cn'
+# uci commit luci
+
+# 2. 让"首页"在左侧菜单排第一（ImmortalWrt 下 quickstart controller 权重有时不对）
+sed -i 's/entry({"admin", "quickstart"/entry({"admin", "quickstart", order = 1}/' package/*/luci-app-quickstart/luasrc/controller/quickstart.lua 2>/dev/null || true
+
+# 3. 清掉 wizard_finished 标记，让首次登录弹向导（可选，看你喜欢不喜欢自动弹）
+mkdir -p files/etc/config
+cat > files/etc/config/quickstart <<'EOF'
+config quickstart 'main'
+	option wizard_finished '0'
+EOF
+
+# -------- luci-app-run （一个RUN插件安装小工具）--------
 echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 
 # -------- Docker --------
