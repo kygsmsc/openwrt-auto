@@ -11,10 +11,10 @@
 #
 
 # ==================解开helloworld feed （ssr-plus来源关键）==============
-sed -i 's/^#\(src-git helloworld\)/\1/' feeds.conf.default
+# sed -i 's/^#\(src-git helloworld\)/\1/' feeds.conf.default
 # 如果上面那行没匹配到（有些分支 feeds.conf.default 里干脆没这行），就直接追加：
-# grep -q 'helloworld' feeds.conf.default || \
-# echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
+grep -q 'helloworld' feeds.conf.default || \
+echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
 ./scripts/feeds update helloworld
 ./scripts/feeds install -a -p helloworld
 # ========================================================================
