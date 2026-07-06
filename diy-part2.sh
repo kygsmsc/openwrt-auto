@@ -79,6 +79,19 @@ rm -rf package/luci-app-run
 git clone --depth=1 https://github.com/wukongdaily/luci-app-run.git package/luci-app-run
 
 echo ">>> [part2] 完成"
+# -------- luci-app-run （一个RUN插件安装小工具）--------
+echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
+
+
+
+#--------------------科学上网-----------------
+echo 'CONFIG_PACKAGE_luci-app-passwall=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=y' >>.config
 # -------- iStore --------
 
 # iStoreOS 特色功能核心包
@@ -127,8 +140,7 @@ if [ -f "package/feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
     sed -i 's/DEPENDS:=+luci-base/DEPENDS:=+luci-base\nNO_MINIFY=1/' \
         package/feeds/nas_luci/luci-app-quickstart/Makefile
 fi
-# -------- luci-app-run （一个RUN插件安装小工具）--------
-echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
+
 
 # -------- Docker --------
 # echo 'CONFIG_PACKAGE_docker=y' >>.config
