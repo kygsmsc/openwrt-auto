@@ -20,7 +20,9 @@ grep -q 'src-git passwall_packages' feeds.conf.default || \
 echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
 grep -q 'src-git passwall_luci' feeds.conf.default || \
 echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' >> feeds.conf.default
-
+./scripts/feeds update passwall_packages passwall_luci
+./scripts/feeds install -a -p passwall_packages
+./scripts/feeds install -p passwall_luci
 ./scripts/feeds update helloworld
 ./scripts/feeds install -a -p helloworld
 # ========================================================================
