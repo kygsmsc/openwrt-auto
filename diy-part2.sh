@@ -87,7 +87,7 @@ echo 'CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y' >>.config
 echo 'CONFIG_PACKAGE_luci-app-istorex=y' >>.config
 echo 'CONFIG_PACKAGE_app-meta-istorex=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config
-echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config
+#echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config
 echo 'CONFIG_PACKAGE_luci-app-istoreos-upgrade=y' >>.config
 echo 'CONFIG_PACKAGE_luci-app-design-config=y' >>.config
 echo 'CONFIG_PACKAGE_luci-app-diskman=y' >>.config
@@ -123,7 +123,10 @@ cat > files/etc/config/quickstart <<'EOF'
 config quickstart 'main'
 	option wizard_finished '0'
 EOF
-
+if [ -f "package/feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
+    sed -i 's/DEPENDS:=+luci-base/DEPENDS:=+luci-base\nNO_MINIFY=1/' \
+        package/feeds/nas_luci/luci-app-quickstart/Makefile
+fi
 # -------- luci-app-run （一个RUN插件安装小工具）--------
 echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 
