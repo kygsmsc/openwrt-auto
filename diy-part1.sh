@@ -15,6 +15,12 @@
 # 如果上面那行没匹配到（有些分支 feeds.conf.default 里干脆没这行），就直接追加：
 grep -q 'helloworld' feeds.conf.default || \
 echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
+
+grep -q 'src-git passwall_packages' feeds.conf.default || \
+echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
+grep -q 'src-git passwall_luci' feeds.conf.default || \
+echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' >> feeds.conf.default
+
 ./scripts/feeds update helloworld
 ./scripts/feeds install -a -p helloworld
 # ========================================================================
