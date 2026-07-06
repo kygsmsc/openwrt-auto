@@ -72,12 +72,12 @@ echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.
 echo ">>> [part1] 添加 iStore 软件源"
 
 grep -q 'src-git istore' feeds.conf.default \
-  || echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+  || echo 'src-git istore https://github.com/linkease/istore.git;main' >> feeds.conf.default
 
 grep -q 'src-git nas' feeds.conf.default \
-  || echo 'src-git nas https://github.com/linkease/nas-packages;master' >> feeds.conf.default
+  || echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
 grep -q 'src-git nas_luci' feeds.conf.default \
-  || echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci;main' >> feeds.conf.default
+  || echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
 
 # 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
 # （workflow 里后面还会再 update -a，这里先装也行，保险点等 part2 后由 workflow 统一装也 ok）
