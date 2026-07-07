@@ -16,7 +16,7 @@
 
 sed -i "/helloworld/d" "feeds.conf.default"
 grep -q 'helloworld' feeds.conf.default || \
-echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
+echo "src-git helloworld https://github.com/fw876/helloworld.git" >> "feeds.conf.default"
 
 grep -q 'src-git passwall_packages' feeds.conf.default || \
 echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
