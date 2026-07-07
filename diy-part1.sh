@@ -17,7 +17,9 @@
 sed -i "/helloworld/d" "feeds.conf.default"
 grep -q 'helloworld' feeds.conf.default || \
 echo "src-git helloworld https://github.com/fw876/helloworld.git" >> "feeds.conf.default"
-
+./scripts/feeds update helloworld
+./scripts/feeds install -a -f -p helloworld
+# ==================解开passwall feed （passwall来源关键）==============
 grep -q 'src-git passwall_packages' feeds.conf.default || \
 echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
 grep -q 'src-git passwall_luci' feeds.conf.default || \
@@ -25,8 +27,7 @@ echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall
 ./scripts/feeds update passwall_packages passwall_luci
 ./scripts/feeds install -a -p passwall_packages
 ./scripts/feeds install -p passwall_luci
-./scripts/feeds update helloworld
-./scripts/feeds install -a -f -p helloworld
+
 # ========================================================================
 #添加自定义插件链接（自己想要什么就github里面搜索然后添加）
 #rm -rf ./package/lean/luci-theme-argon && git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git package/lean/luci-theme-argon  #新的argon主题
