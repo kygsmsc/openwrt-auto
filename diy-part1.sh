@@ -77,8 +77,7 @@ echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall
 # git branch
 # git checkout v23.05.4 #在tag里有版本号，填入你要的版本号，我选我现在最新的v23.05.4
 
-# 添加 iStore 商店软件源
-# ===============================================
+# ------------------------添加 iStore 软件源--------------------------
 #!/bin/bash
 echo ">>> [part1] 添加 iStore 软件源"
 
