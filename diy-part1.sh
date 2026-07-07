@@ -14,9 +14,9 @@
 # sed -i 's/^#\(src-git helloworld\)/\1/' feeds.conf.default
 # 如果上面那行没匹配到（有些分支 feeds.conf.default 里干脆没这行），就直接追加：
 
-sed -i "/helloworld/d" "feeds.conf.default"
+sed -i '/helloworld/d' feeds.conf.default
 grep -q 'helloworld' feeds.conf.default || \
-echo "src-git helloworld https://github.com/fw876/helloworld.git" >> "feeds.conf.default"
+echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
 ./scripts/feeds update helloworld
 ./scripts/feeds install -a -f -p helloworld
 # ==================解开passwall feed （passwall来源关键）==============
