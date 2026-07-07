@@ -261,12 +261,14 @@ echo 'CONFIG_PACKAGE_luci-i18n-filebrowser-zh-cn=y' >>.config
 # echo "CONFIG_FIRMWARE_INCLUDE_SSOBFS=y" >>.config      # simple-obfs混淆插件,SS 开了才可以打开
 # echo "CONFIG_FIRMWARE_INCLUDE_V2RAY=n" >>.config  # 集成v2ray执行文件（3.8M左右)，如果不集成，会从网上下载下来执行，不影响正常使用
 # echo "CONFIG_FIRMWARE_INCLUDE_TROJAN=n" >>.config # 集成trojan执行文件(1.1M左右)，如果不集成，会从网上下载下来执行，不影响正常使用
-echo "CONFIG_PACKAGE_luci-app-ssr-plus=y" >>.config
-echo "CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=y" >>.config
-echo "CONFIG_PACKAGE_chinadns-ng=y" >>.config
-echo "CONFIG_PACKAGE_dns2socks=y" >>.config
-echo "CONFIG_PACKAGE_simple-obfs=y" >>.config
-echo "CONFIG_PACKAGE_v2ray-plugin=n" >>.config
+
+echo 'CONFIG_PACKAGE_CONFIG_PACKAGE_luci=y' >>.config
+echo 'CONFIG_PACKAGE_luci-app-ssr-plus=y' >>.config
+echo 'CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=y' >>.config
+echo 'CONFIG_PACKAGE_chinadns-ng=y' >>.config
+echo 'CONFIG_PACKAGE_dns2socks=y' >>.config
+echo 'CONFIG_PACKAGE_simple-obfs=y' >>.config
+echo 'CONFIG_PACKAGE_v2ray-plugin=n' >>.config
 # 文件
 # echo "CONFIG_FIRMWARE_INCLUDE_CADDY=y" >>.config    # 在线文件管理服务
 # echo "CONFIG_FIRMWARE_INCLUDE_CADDYBIN=n" >>.config # 集成 caddu执行文件，此文件有13M,请注意固件大小。如果不集成，会从网上下载下来执行，不影响正常使用
