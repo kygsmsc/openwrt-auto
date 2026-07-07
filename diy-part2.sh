@@ -85,13 +85,13 @@ echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 
 
 #--------------------passwall科学上网-----------------
-echo 'CONFIG_PACKAGE_luci-app-passwall=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=y' >>.config
 # -------- iStore --------
 
 # iStoreOS 特色功能核心包
