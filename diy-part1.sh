@@ -81,13 +81,13 @@ echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall
 #!/bin/bash
 echo ">>> [part1] 添加 iStore 软件源"
 
-grep -q 'src-git istore' feeds.conf.default \
+grep -q '^src-git istore' feeds.conf.default \
   || echo 'src-git istore https://github.com/linkease/istore.git;main' >> feeds.conf.default
 
-grep -q 'src-git nas' feeds.conf.default \
+grep -q '^src-git nas' feeds.conf.default \
   || echo 'src-git nas https://github.com/linkease/nas-packages.git;master' >> feeds.conf.default
 
-grep -q 'src-git nas_luci' feeds.conf.default \
+grep -q '^src-git nas_luci' feeds.conf.default \
   || echo 'src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main' >> feeds.conf.default
 
 # 趁 part1 阶段把 istore feed 拉了并装 luci-app-store
@@ -95,7 +95,8 @@ grep -q 'src-git nas_luci' feeds.conf.default \
 # 推荐：part1 只改 feeds.conf，install 交给 workflow 的 ./scripts/feeds install -a
 # 但如果 workflow 里没单独 install luci-app-store，就在这里装：
 ./scripts/feeds update istore nas nas_luci
-./scripts/feeds install -a -p istore
 ./scripts/feeds install -a -p nas
 ./scripts/feeds install -a -p nas_luci
+./scripts/feeds install -p istore luci-app-store
+./scripts/feeds install -p istore luci-app-quickstart
 echo ">>> [part1] 完成"
