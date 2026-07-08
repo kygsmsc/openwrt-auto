@@ -67,9 +67,9 @@ sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='$utc_name'/g" packa
 # ===============================================
 # 添加 luci-theme-istore（iStoreOS 蓝白主题）
 # ===============================================
-# echo ">>> [part2] 添加 luci-theme-argon"
-# rm -rf package/luci-theme-argon
-# git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+echo ">>> [part2] 添加 luci-theme-argon"
+rm -rf package/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
 # ===============================================
 # 添加 luci-app-run（悟空Daily）
@@ -92,45 +92,54 @@ echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=y' >>.config
-# -------- iStore --------
 
-# iStoreOS 特色功能核心包
-echo 'CONFIG_PACKAGE_luci-app-quickstart=y' >>.config
-echo 'CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-istorex=y' >>.config
-echo 'CONFIG_PACKAGE_app-meta-istorex=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config
-#echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-istoreos-upgrade=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-design-config=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-diskman=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-partexp=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-linkease=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-ddnsto=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-dockerman=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-ttyd=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-samba4=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-upnp=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-wol=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-filetransfer=y' >>.config
+#-------------------iStore 商店系列（iStoreOS / 配置项-功能说明）---------------------	
+echo 'CONFIG_PACKAGE_luci-app-quickstart=y' >>.config	          #  LuCI 快速入门向导，首次登录引导配置 WAN/LAN/密码/时区等
+echo 'CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y' >>.config      # QuickStart 简体中文语言包
+echo 'CONFIG_PACKAGE_luci-app-istorex=y' >>.config	              # iStoreX 基础框架（iStore 应用商店后端/前端壳）
+echo 'CONFIG_PACKAGE_app-meta-istorex=y' >>.config	              # iStoreX 元数据包（分类信息、图标、依赖汇总）
+# echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config      	      # iStore 应用商店，可在 Web 界面在线安装/卸载 ipk 应用
+#echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config	      # iStore 简体中文语言包
+echo 'CONFIG_PACKAGE_luci-app-istoreos-upgrade=y' >>.config       # iStoreOS 固件在线升级/检查更新工具
+echo 'CONFIG_PACKAGE_luci-app-design-config=y' >>.config	      # iStoreOS 主题/设计配置（Logo、配色、页脚等）
+	
+#-------------------iStore 商店系列（磁盘 & 分区管理）---------------------	
+	
+# echo 'CONFIG_PACKAGE_luci-app-diskman=y' >>.config	              # 磁盘管理（查看/格式化/挂载 EXT4/NTFS/exFAT 等）
+# echo 'CONFIG_PACKAGE_luci-app-partexp=y' >>.config                # 分区扩展工具，把 overlay/rootfs 扩展到整个存储分区（常用于 U 盘/SSD）
+	
+#-------------------iStore 商店系列（ 终端 / 文件 / 服务工具）---------------------	
+	
+echo 'CONFIG_PACKAGE_luci-app-ttyd=y' >>.config	                  # 浏览器内嵌 TTY 终端（直接网页 SSH 进路由器）
+echo 'CONFIG_PACKAGE_luci-app-filetransfer=y' >>.config	          # LuCI 文件上传/下载（SCP 替代，方便传 ipk/配置文件）
+# echo 'CONFIG_PACKAGE_luci-app-samba4=y' >>.config	              # Samba 4 文件共享（局域网 Windows 访问路由器磁盘）
+echo 'CONFIG_PACKAGE_luci-app-upnp=y' >>.config	                  # UPnP / NAT-PMP（BT/PT/游戏自动映射端口）
+echo 'CONFIG_PACKAGE_luci-app-wol=y' >>.config	                  # Wake on LAN（网页点按钮唤醒局域网电脑）
+	
+#-------------------iStore 商店系列-Docker & 私有云相关（x86 / 大闪存设备）---------------------	
+	
+# echo 'CONFIG_PACKAGE_luci-app-dockerman=y' >>.config	          # Docker 容器管理界面（需底层 dockerd + 足够空间）
+# echo 'CONFIG_PACKAGE_luci-app-linkease=y' >>.config	          # 易有云 / Linkease（内网文件私有云 + 远程访问，需账号）
+# echo 'CONFIG_PACKAGE_luci-app-ddnsto=y' >>.config	              # DDNSTO（第三方内网穿透 + 远程管理，需官网注册 Token）
 
-# 主题（iStoreOS 官方紫调 Argon）
-# echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-argon-config=y' >>.config
-# echo 'CONFIG_LUCI_LANG_zh_Hans=y' >>.config
+
+# -----------------主题（iStoreOS 官方紫调 Argon）-----------------------
+echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config             # Argon 主题本体（好看、动画、毛玻璃）
+echo 'CONFIG_PACKAGE_luci-app-argon-config=y' >>.config         # Argon 的主题配置工具（Web 页面）​
+echo 'CONFIG_LUCI_LANG_zh_Hans=y' >>.config                     # 启用 LuCI 的简体中文语言包
 
 # quickstart 依赖的 iptables / 内核模块（ImmortalWrt 24.10 是 nftables 底，按需）
 echo 'CONFIG_PACKAGE_iptables-nft-compat=y' >>.config
 
-# 1. 默认主题切 Argon
-# uci set luci.main.mediaurlbase='/luci-static/argon'
-# uci set luci.main.lang='zh_cn'
-# uci commit luci
+# -----------------1. 默认主题切 Argon-----------------
+uci set luci.main.mediaurlbase='/luci-static/argon'
+uci set luci.main.lang='zh_cn'
+uci commit luci
 
-# 2. 让"首页"在左侧菜单排第一（ImmortalWrt 下 quickstart controller 权重有时不对）
+# ----------------2. 让"首页"在左侧菜单排第一（ImmortalWrt 下 quickstart controller 权重有时不对）---------------------
 sed -i 's/entry({"admin", "quickstart"/entry({"admin", "quickstart", order = 1}/' package/*/luci-app-quickstart/luasrc/controller/quickstart.lua 2>/dev/null || true
 
-# 3. 清掉 wizard_finished 标记，让首次登录弹向导（可选，看你喜欢不喜欢自动弹）
+# ----------------3. 清掉 wizard_finished 标记，让首次登录弹向导（可选，看你喜欢不喜欢自动弹）--------------------
 mkdir -p files/etc/config
 cat > files/etc/config/quickstart <<'EOF'
 config quickstart 'main'
@@ -140,7 +149,7 @@ if [ -f "package/feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
     sed -i 's/DEPENDS:=+luci-base/DEPENDS:=+luci-base\nNO_MINIFY=1/' \
         package/feeds/nas_luci/luci-app-quickstart/Makefile
 fi
-
+#-------------------------------------------------------------------------------------
 
 # -------- Docker --------
 # echo 'CONFIG_PACKAGE_docker=y' >>.config
