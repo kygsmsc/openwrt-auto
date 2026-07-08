@@ -91,13 +91,13 @@ echo 'CONFIG_PACKAGE_luci-app-passwall=y' >> .config
 echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y' >> .config   # 可选：中文
 
 # 核心依赖（通常自动选，但保险起见显式写）
-echo 'CONFIG_PACKAGE_pdnsd-alt=y' >> .config
-echo 'CONFIG_PACKAGE_tcping=y' >> .config
+echo 'CONFIG_PACKAGE_pdnsd-alt=n' >> .config
+echo 'CONFIG_PACKAGE_tcping=n' >> .config
 echo 'CONFIG_PACKAGE_chinadns-ng=y' >> .config
-echo 'CONFIG_PACKAGE_dns2socks=y' >> .config
+echo 'CONFIG_PACKAGE_dns2socks=n' >> .config
 echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >> .config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >> .config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=y' >> .config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=n' >> .config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=n' >> .config
 
 # 可选（Trojan / Hysteria / Naive / Sing-box 按需加）
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus=y' >> .config
