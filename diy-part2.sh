@@ -85,13 +85,24 @@ echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 
 
 #--------------------passwall科学上网-----------------
-# echo 'CONFIG_PACKAGE_luci-app-passwall=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Libev_Client=y' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=y' >>.config
+
+# ===== PassWall 最小可用 =====
+echo 'CONFIG_PACKAGE_luci-app-passwall=y' >> .config
+echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y' >> .config   # 可选：中文
+
+# 核心依赖（通常自动选，但保险起见显式写）
+echo 'CONFIG_PACKAGE_pdnsd-alt=y' >> .config
+echo 'CONFIG_PACKAGE_tcping=y' >> .config
+echo 'CONFIG_PACKAGE_chinadns-ng=y' >> .config
+echo 'CONFIG_PACKAGE_dns2socks=y' >> .config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >> .config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >> .config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=y' >> .config
+
+# 可选（Trojan / Hysteria / Naive / Sing-box 按需加）
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus=y' >> .config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Hysteria=y' >> .config
+# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_singbox=y' >> .config
 
 #-------------------iStore 商店系列（iStoreOS / 配置项-功能说明）---------------------	
 echo 'CONFIG_PACKAGE_luci-app-quickstart=y' >>.config	          #  LuCI 快速入门向导，首次登录引导配置 WAN/LAN/密码/时区等
@@ -193,9 +204,9 @@ fi
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_kcptun=n' >>.config
 # echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=n' >>.config
 
-echo '添加文件浏览器'
-echo 'CONFIG_PACKAGE_luci-app-filebrowser=y' >>.config
-echo 'CONFIG_PACKAGE_luci-i18n-filebrowser-zh-cn=y' >>.config
+# echo '添加文件浏览器'
+# echo 'CONFIG_PACKAGE_luci-app-filebrowser=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-i18n-filebrowser-zh-cn=y' >>.config
 
 # echo '添加adguardhome'
 # git clone $adguardhome_url package/lean/luci-app-adguardhome
@@ -271,13 +282,13 @@ echo 'CONFIG_PACKAGE_luci-i18n-filebrowser-zh-cn=y' >>.config
 # echo "CONFIG_FIRMWARE_INCLUDE_V2RAY=n" >>.config  # 集成v2ray执行文件（3.8M左右)，如果不集成，会从网上下载下来执行，不影响正常使用
 # echo "CONFIG_FIRMWARE_INCLUDE_TROJAN=n" >>.config # 集成trojan执行文件(1.1M左右)，如果不集成，会从网上下载下来执行，不影响正常使用
 
-echo 'CONFIG_PACKAGE_CONFIG_PACKAGE_luci=y' >>.config
-echo 'CONFIG_PACKAGE_luci-app-ssr-plus=y' >>.config
-echo 'CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=y' >>.config
-echo 'CONFIG_PACKAGE_chinadns-ng=y' >>.config
-echo 'CONFIG_PACKAGE_dns2socks=y' >>.config
-echo 'CONFIG_PACKAGE_simple-obfs=y' >>.config
-echo 'CONFIG_PACKAGE_v2ray-plugin=n' >>.config
+# echo 'CONFIG_PACKAGE_CONFIG_PACKAGE_luci=y' >>.config
+# echo 'CONFIG_PACKAGE_luci-app-ssr-plus=y' >>.config
+# echo 'CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=y' >>.config
+# echo 'CONFIG_PACKAGE_chinadns-ng=y' >>.config
+# echo 'CONFIG_PACKAGE_dns2socks=y' >>.config
+# echo 'CONFIG_PACKAGE_simple-obfs=y' >>.config
+# echo 'CONFIG_PACKAGE_v2ray-plugin=n' >>.config
 # 文件
 # echo "CONFIG_FIRMWARE_INCLUDE_CADDY=y" >>.config    # 在线文件管理服务
 # echo "CONFIG_FIRMWARE_INCLUDE_CADDYBIN=n" >>.config # 集成 caddu执行文件，此文件有13M,请注意固件大小。如果不集成，会从网上下载下来执行，不影响正常使用
