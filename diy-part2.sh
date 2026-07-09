@@ -174,9 +174,9 @@ echo 'CONFIG_PACKAGE_ppp=y' >> .config    # PPP 协议核心程序（原配置�
 echo 'CONFIG_PACKAGE_ppp-mod-pppoe=y' >> .config    # PPPoE 内核模块 + 用户态插件（原配置已集成）     ≈30 KB​
 
 # ---------------------可选：多线负载均衡----------------------
-echo 'CONFIG_PACKAGE_mwan3=y' >> .config     # 多 WAN 负载均衡框架   
-echo 'CONFIG_PACKAGE_luci-app-mwan3=y' >> .config
-
+echo 'CONFIG_PACKAGE_mwan3=y' >> .config     # 多 WAN 负载均衡框架--管理多条出口（wan / wan2 / wan3…）   ≈150 KB​
+echo 'CONFIG_PACKAGE_luci-app-mwan3=y' >> .config    # LuCI Web 管理界面 Web 中可视化配置      ≈80 KB​
+      
 
 # -------- Docker --------
 # echo 'CONFIG_PACKAGE_docker=y' >>.config
