@@ -86,18 +86,25 @@ echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 
 #--------------------passwall科学上网-----------------
 
-# ===== PassWall 最小可用 =====
-echo 'CONFIG_PACKAGE_luci-app-passwall=y' >> .config
-echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y' >> .config   # 可选：中文
+#----------------PassWall 最小可用-------------------------------------------------功能说明（中文）---------------------------------------------对固件体积影响----
+echo 'CONFIG_PACKAGE_luci-app-passwall=y' >> .config     #  安装 LuCI 主程序（Web界面+规则生成+nft/ipt管理），不含任何代理二进制    +≈300 KB​ ✅必须
+echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y' >> .config   # 可选：中文	安装 PassWall 简体中文语言包（仅 po/lua 文本）         +≈60 KB​ ⬆可选
+
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >> .config   # ssr客户端（最轻量 SS 实现）    ≈900 KB–1 MB​ ✅关（最小代理开）
+
 
 # 核心依赖（通常自动选，但保险起见显式写）
-echo 'CONFIG_PACKAGE_pdnsd-alt=n' >> .config
-echo 'CONFIG_PACKAGE_tcping=n' >> .config
-echo 'CONFIG_PACKAGE_chinadns-ng=y' >> .config
-echo 'CONFIG_PACKAGE_dns2socks=n' >> .config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y' >> .config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=n' >> .config
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=n' >> .config
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=n' >> .config   # ❌ Xray-core（VMess/VLESS/Trojan/Reality），这是大体积项    ≈6.5–7 MB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray=n' >> .config   # ❌ V2Ray（Go 版），功能类似 Xray 但更大    ≈8–9 MB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=n' >> .config   # ❌ GeoIP / GeoSite 数据库（大陆/国外分流用）    ≈1.5–2 MB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=n' >> .config   # ❌ Simple-Obfs 混淆插件（SS 用）    ≈150–200 KB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan=n' >> .config   # ❌ Trojan-GFW / Trojan-Go​    ≈2–3 MB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaCl=n' >> .config   # ❌ NaCl 加密库（老 SS chacha20 依赖）    ≈200–300 KB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_dns2socks=n' >> .config   # ❌ dns2socks（TCP DNS → SOCKS5 转换）    ≈120–150 KB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_pdnsd-alt=n' >> .config   # ❌ pdnsd-alt（本地 DNS 缓存/离线解析）    ≈250 KB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_tcping=n' >> .config   # ❌ tcping（TCP 延迟测试工具）    ≈80–100 KB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_chinadns-ng=n' >> .config   # ❌ ChinaDNS-NG（国内外 DNS 分流防污染）    ≈130–160 KB​ ✅关
+
 
 # 可选（Trojan / Hysteria / Naive / Sing-box 按需加）
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan_Plus=y' >> .config
@@ -195,15 +202,6 @@ fi
 #echo '添加Lienol包' #？？？？？？？？？？？？？？？？？？？？、
 #git clone $lienol_url package/Lienol
 
-# echo '添加Passwall'
-# echo 'CONFIG_PACKAGE_luci-app-passwall=n' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan=n' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_simple-obfs=n' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_v2ray-plugin=n' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=n' >>.config
-# echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_kcptun=n' >>.config
-# echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=n' >>.config
-
 # echo '添加文件浏览器'
 # echo 'CONFIG_PACKAGE_luci-app-filebrowser=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-i18n-filebrowser-zh-cn=y' >>.config
@@ -275,7 +273,7 @@ fi
 # echo "CONFIG_FIRMWARE_CPU_900MHZ=n" >>.config
 # echo "CONFIG_FIRMWARE_CPU_600MHZ=n" >>.config
 
-# ssr-科学
+# ----------------ssr-科学-在 OpenWrt 23.05+ / ImmortalWrt 24.x / OpenWrt 主线的 feeds 里已经被废弃删除，原因是协议停止维护 + 安全隐患。-------
 # echo "CONFIG_FIRMWARE_INCLUDE_SHADOWSOCKS=y" >>.config # SS plus+
 # echo "CONFIG_FIRMWARE_INCLUDE_SSSERVER=n" >>.config    # SS server
 # echo "CONFIG_FIRMWARE_INCLUDE_SSOBFS=y" >>.config      # simple-obfs混淆插件,SS 开了才可以打开
