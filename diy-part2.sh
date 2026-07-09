@@ -46,6 +46,7 @@ sed -i 's@.*CYXluq4wUazHjmCDBCqXF*@#&@g' package/lean/default-settings/files/zzz
 # echo "修改机器名称"
 sed -i "s/OpenWrt/$device_name/g" package/base-files/files/bin/config_generate
 
+
 # echo "修改wifi名称"
 sed -i "s/OpenWrt/$wifi_name/g" package/kernel/mac80211/files/lib/wifi/mac80211.sh
 
@@ -67,9 +68,11 @@ sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='$utc_name'/g" packa
 # ===============================================
 # 添加 luci-theme-istore（iStoreOS 蓝白主题）
 # ===============================================
-echo ">>> [part2] 添加 luci-theme-argon"
 rm -rf package/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+
+rm -rf package/luci-app-argon-config
+git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
 
 # ===============================================
 # 添加 luci-app-run（悟空Daily）
@@ -111,11 +114,6 @@ echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_chinadns-ng=n' >> .config   # ❌
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Hysteria=y' >> .config
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_singbox=y' >> .config
 
-# ===== 强制 QuickStart 向导首次弹出 =====
-cat > files/etc/config/quickstart <<'EOF'
-config quickstart 'main'
-    option wizard_finished '0'
-EOF
 
 #-------------------iStore 商店系列（iStoreOS / 配置项-功能说明）---------------------	
 
@@ -376,5 +374,3 @@ echo "CONFIG_FIRMWARE_INCLUDE_SMARTDNSBIN=y" >>.config  # smartdns二进制文�
 
 
 #--------------------------------------------------------------------------------------------------------------
-
-
