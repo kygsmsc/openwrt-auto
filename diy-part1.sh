@@ -10,6 +10,21 @@
 # Description: OpenWrt DIY script part 1 (Before Update feeds)
 #
 
+# ================== 自动识别 OpenWrt 类型（Lean / ImmortalWrt / OpenWrt） ==================
+detect_target() {
+	if [ -f include/lean-version.mk ] || grep -q 'LEDE' include/version.mk 2>/dev/null; then
+		TARGET_TYPE="LEAN"
+	elif grep -q 'ImmortalWrt' include/version.mk 2>/dev/null; then
+		TARGET_TYPE="IMMORTALWRT"
+	else
+		TARGET_TYPE="OPENWRT"
+	fi
+	echo ">>> [part1] Detected TARGET_TYPE: $TARGET_TYPE"
+}
+detect_target
+export TARGET_TYPE
+# ============================================================================================
+
 # ==================解开helloworld feed （ssr-plus来源关键）==============
 # sed -i 's/^#\(src-git helloworld\)/\1/' feeds.conf.default
 # 如果上面那行没匹配到（有些分支 feeds.conf.default 里干脆没这行），就直接追加：
@@ -17,13 +32,17 @@
 sed -i '/helloworld/d' feeds.conf.default
 grep -q 'helloworld' feeds.conf.default || \
 echo 'src-git helloworld https://github.com/fw876/helloworld.git' >> feeds.conf.default
-./scripts/feeds update helloworld
+
+[ ! -d "feeds/helloworld" ] && ./scripts/feeds update helloworld
 ./scripts/feeds install -a -f -p helloworld
+
 # ==================解开passwall feed （passwall来源关键）==============
 grep -q 'src-git passwall_packages' feeds.conf.default || \
 echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
+
 grep -q 'src-git passwall_luci' feeds.conf.default || \
 echo 'src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main' >> feeds.conf.default
+
 ./scripts/feeds update passwall_packages passwall_luci
 ./scripts/feeds install -a -p passwall_packages
 ./scripts/feeds install -p passwall_luci
