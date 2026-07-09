@@ -168,6 +168,15 @@ if [ -f "package/feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
         package/feeds/nas_luci/luci-app-quickstart/Makefile
 fi
 #-------------------------------------------------------------------------------------
+# -----------------------一线多播----------------------------
+echo 'CONFIG_PACKAGE_kmod-macvlan=y' >> .config    # 同一物理 WAN 口上虚拟出多个 MAC 地址不同的子接口    	≈20 KB
+echo 'CONFIG_PACKAGE_ppp=y' >> .config    # PPP 协议核心程序（原配置已集成）     ≈120 KB
+echo 'CONFIG_PACKAGE_ppp-mod-pppoe=y' >> .config    # PPPoE 内核模块 + 用户态插件（原配置已集成）     ≈30 KB​
+
+# ---------------------可选：多线负载均衡----------------------
+echo 'CONFIG_PACKAGE_mwan3=y' >> .config     # 多 WAN 负载均衡框架   
+echo 'CONFIG_PACKAGE_luci-app-mwan3=y' >> .config
+
 
 # -------- Docker --------
 # echo 'CONFIG_PACKAGE_docker=y' >>.config
