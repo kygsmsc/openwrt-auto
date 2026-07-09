@@ -111,16 +111,26 @@ echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_chinadns-ng=n' >> .config   # ❌
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Hysteria=y' >> .config
 # echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_singbox=y' >> .config
 
+# ===== 强制 QuickStart 向导首次弹出 =====
+cat > files/etc/config/quickstart <<'EOF'
+config quickstart 'main'
+    option wizard_finished '0'
+EOF
+
 #-------------------iStore 商店系列（iStoreOS / 配置项-功能说明）---------------------	
-echo 'CONFIG_PACKAGE_luci-app-quickstart=y' >>.config	          #  LuCI 快速入门向导，首次登录引导配置 WAN/LAN/密码/时区等
-echo 'CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y' >>.config      # QuickStart 简体中文语言包
+
 echo 'CONFIG_PACKAGE_luci-app-istorex=y' >>.config	              # iStoreX 基础框架（iStore 应用商店后端/前端壳）
 echo 'CONFIG_PACKAGE_app-meta-istorex=y' >>.config	              # iStoreX 元数据包（分类信息、图标、依赖汇总）
-# echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config      	      # iStore 应用商店，可在 Web 界面在线安装/卸载 ipk 应用
-#echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config	      # iStore 简体中文语言包
+echo 'CONFIG_PACKAGE_luci-app-store=y' >>.config      	      # iStore 应用商店，可在 Web 界面在线安装/卸载 ipk 应用
+echo 'CONFIG_PACKAGE_luci-i18n-store-zh-cn=y' >>.config	      # iStore 简体中文语言包
 echo 'CONFIG_PACKAGE_luci-app-istoreos-upgrade=y' >>.config       # iStoreOS 固件在线升级/检查更新工具
 echo 'CONFIG_PACKAGE_luci-app-design-config=y' >>.config	      # iStoreOS 主题/设计配置（Logo、配色、页脚等）
-	
+
+#-------------------iStore 商店系列（QuickStart 向导）---------------------	
+
+echo 'CONFIG_PACKAGE_luci-app-quickstart=y' >>.config	          #  LuCI 快速入门向导，首次登录引导配置 WAN/LAN/密码/时区等
+echo 'CONFIG_PACKAGE_luci-i18n-quickstart-zh-cn=y' >>.config      # QuickStart 简体中文语言包
+
 #-------------------iStore 商店系列（磁盘 & 分区管理）---------------------	
 	
 # echo 'CONFIG_PACKAGE_luci-app-diskman=y' >>.config	              # 磁盘管理（查看/格式化/挂载 EXT4/NTFS/exFAT 等）
@@ -150,14 +160,17 @@ echo 'CONFIG_LUCI_LANG_zh_Hans=y' >>.config                     # 启用 LuCI �
 echo 'CONFIG_PACKAGE_iptables-nft-compat=y' >>.config
 
 # -----------------1. 默认主题切 Argon-----------------
-uci set luci.main.mediaurlbase='/luci-static/argon'
-uci set luci.main.lang='zh_cn'
-uci commit luci
+mkdir -p files/etc/config
+cat > files/etc/config/luci <<'EOF'
+config luci 'main'
+    option mediaurlbase '/luci-static/argon'
+    option lang 'zh_cn'
+EOF
 
 # ----------------2. 让"首页"在左侧菜单排第一（ImmortalWrt 下 quickstart controller 权重有时不对）---------------------
 sed -i 's/entry({"admin", "quickstart"/entry({"admin", "quickstart", order = 1}/' package/*/luci-app-quickstart/luasrc/controller/quickstart.lua 2>/dev/null || true
 
-# ----------------3. 清掉 wizard_finished 标记，让首次登录弹向导（可选，看你喜欢不喜欢自动弹）--------------------
+# ----------------3. 清掉 wizard_finished 标记，强制 QuickStart 向导首次弹出（可选，看你喜欢不喜欢自动弹）--------------------
 mkdir -p files/etc/config
 cat > files/etc/config/quickstart <<'EOF'
 config quickstart 'main'
