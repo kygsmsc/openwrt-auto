@@ -11,6 +11,19 @@
 # cd $WORK_PATH 目录下,先运行的 public.h -> 设备.h -> scripts/feeds install -a
 # 必须的文件
 
+# ================== 复用 part1 的 TARGET_TYPE ==================
+if [ -z "$TARGET_TYPE" ]; then
+	if [ -f include/lean-version.mk ] || grep -q 'LEDE' include/version.mk 2>/dev/null; then
+		TARGET_TYPE="LEAN"
+	elif grep -q 'ImmortalWrt' include/version.mk 2>/dev/null; then
+		TARGET_TYPE="IMMORTALWRT"
+	else
+		TARGET_TYPE="OPENWRT"
+	fi
+	echo ">>> [part2] Detected TARGET_TYPE: $TARGET_TYPE"
+fi
+# ===============================================================
+
 USER_NAME='admin'        # 用户名 admin
 device_name='G-DOCK'      # 设备名
 wifi_name="OpenWrt"       # Wifi 名字 
@@ -34,11 +47,47 @@ DEFAULT_PATH="./user/shared/defaults.h" # 默认文件配置目录
 # 命令
 
 
-# echo '修改用户名'
-# sed -i 's/#define\s*SYS_USER_ROOT\s*"admin"/#define  SYS_USER_ROOT     "'$USER_NAME'"/g' $DEFAULT_PATH
+# -----------------------echo '修改用户名'----------------------------
+
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/99-set-user <<EOF
+#!/bin/sh
+
+# 设置 Web 登录用户名（仅首次启动生效）
+
+if ! uci -q get system.@system[0] >/dev/null 2>&1; then
+	uci set system.@system[0]=system
+fi
+
+uci -q set system.@system[0].username='${USER_NAME}'
+uci commit system
+
+exit 0
+EOF
+
+chmod +x files/etc/uci-defaults/99-set-user
+
 
 # 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
-sed -i 's@.*CYXluq4wUazHjmCDBCqXF*@#&@g' package/lean/default-settings/files/zzz-default-settings
+# ========== 自动适配 zzz-default-settings 路径 ==========
+ZZZ_DEFAULT=""
+for p in \
+	package/lean/default-settings/files/zzz-default-settings \
+	package/default-settings/files/zzz-default-settings \
+	feeds/luci/modules/luci-base/root/etc/uci-defaults/zzz-default-settings; do
+	if [ -f "$p" ]; then
+		ZZZ_DEFAULT="$p"
+		break
+	fi
+done
+
+if [ -n "$ZZZ_DEFAULT" ]; then
+	sed -i 's@.*CYXluq4wUazHjmCDBCqXF*@#&@g' "$ZZZ_DEFAULT"
+	echo ">>> [part2] Patch root password skip: $ZZZ_DEFAULT"
+else
+	echo "⚠️  zzz-default-settings not found, skip root password patch"
+fi
+# ========================================================
 
 # 修改想要的root密码
 #sed -i 's/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::/root:你的密码/g' package/lean/default-settings/files/zzz-default-settings
@@ -90,23 +139,23 @@ echo 'CONFIG_PACKAGE_luci-app-run=y' >>.config
 #--------------------passwall科学上网-----------------
 
 #----------------PassWall 最小可用-------------------------------------------------功能说明（中文）---------------------------------------------对固件体积影响----
-echo 'CONFIG_PACKAGE_luci-app-passwall=y' >> .config     #  安装 LuCI 主程序（Web界面+规则生成+nft/ipt管理），不含任何代理二进制    +≈300 KB​ ✅必须
-echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y' >> .config   # 可选：中文	安装 PassWall 简体中文语言包（仅 po/lua 文本）         +≈60 KB​ ⬆可选
+echo 'CONFIG_PACKAGE_luci-app-passwall=y' >> .config     #  安装 LuCI 主程序（Web界面+规则生成+nft/ipt管理），不含任何代理二进制    +≈300 KB ✅必须
+echo 'CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y' >> .config   # 可选：中文	安装 PassWall 简体中文语言包（仅 po/lua 文本）         +≈60 KB ⬆可选
 
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >> .config   # ssr客户端（最轻量 SS 实现）    ≈900 KB–1 MB​ ✅关（最小代理开）
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client=y' >> .config   # ssr客户端（最轻量 SS 实现）    ≈900 KB–1 MB ✅关（最小代理开）
 
 
 # 核心依赖（通常自动选，但保险起见显式写）
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=n' >> .config   # ❌ Xray-core（VMess/VLESS/Trojan/Reality），这是大体积项    ≈6.5–7 MB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray=n' >> .config   # ❌ V2Ray（Go 版），功能类似 Xray 但更大    ≈8–9 MB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=n' >> .config   # ❌ GeoIP / GeoSite 数据库（大陆/国外分流用）    ≈1.5–2 MB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=n' >> .config   # ❌ Simple-Obfs 混淆插件（SS 用）    ≈150–200 KB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan=n' >> .config   # ❌ Trojan-GFW / Trojan-Go​    ≈2–3 MB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaCl=n' >> .config   # ❌ NaCl 加密库（老 SS chacha20 依赖）    ≈200–300 KB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_dns2socks=n' >> .config   # ❌ dns2socks（TCP DNS → SOCKS5 转换）    ≈120–150 KB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_pdnsd-alt=n' >> .config   # ❌ pdnsd-alt（本地 DNS 缓存/离线解析）    ≈250 KB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_tcping=n' >> .config   # ❌ tcping（TCP 延迟测试工具）    ≈80–100 KB​ ✅关
-echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_chinadns-ng=n' >> .config   # ❌ ChinaDNS-NG（国内外 DNS 分流防污染）    ≈130–160 KB​ ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=n' >> .config   # ❌ Xray-core（VMess/VLESS/Trojan/Reality），这是大体积项    ≈6.5–7 MB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray=n' >> .config   # ❌ V2Ray（Go 版），功能类似 Xray 但更大    ≈8–9 MB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata=n' >> .config   # ❌ GeoIP / GeoSite 数据库（大陆/国外分流用）    ≈1.5–2 MB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs=n' >> .config   # ❌ Simple-Obfs 混淆插件（SS 用）    ≈150–200 KB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan=n' >> .config   # ❌ Trojan-GFW / Trojan-Go    ≈2–3 MB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaCl=n' >> .config   # ❌ NaCl 加密库（老 SS chacha20 依赖）    ≈200–300 KB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_dns2socks=n' >> .config   # ❌ dns2socks（TCP DNS → SOCKS5 转换）    ≈120–150 KB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_pdnsd-alt=n' >> .config   # ❌ pdnsd-alt（本地 DNS 缓存/离线解析）    ≈250 KB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_tcping=n' >> .config   # ❌ tcping（TCP 延迟测试工具）    ≈80–100 KB ✅关
+echo 'CONFIG_PACKAGE_luci-app-passwall_INCLUDE_chinadns-ng=n' >> .config   # ❌ ChinaDNS-NG（国内外 DNS 分流防污染）    ≈130–160 KB ✅关
 
 
 # 可选（Trojan / Hysteria / Naive / Sing-box 按需加）
@@ -151,11 +200,13 @@ echo 'CONFIG_PACKAGE_luci-app-wol=y' >>.config	                  # Wake on LAN�
 
 # -----------------主题（iStoreOS 官方紫调 Argon）-----------------------
 echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config             # Argon 主题本体（好看、动画、毛玻璃）
-echo 'CONFIG_PACKAGE_luci-app-argon-config=y' >>.config         # Argon 的主题配置工具（Web 页面）​
+echo 'CONFIG_PACKAGE_luci-app-argon-config=y' >>.config         # Argon 的主题配置工具（Web 页面）
 echo 'CONFIG_LUCI_LANG_zh_Hans=y' >>.config                     # 启用 LuCI 的简体中文语言包
 
 # quickstart 依赖的 iptables / 内核模块（ImmortalWrt 24.10 是 nftables 底，按需）
-echo 'CONFIG_PACKAGE_iptables-nft-compat=y' >>.config
+if [ "$TARGET_TYPE" = "IMMORTALWRT" ] || [ "$TARGET_TYPE" = "OPENWRT" ]; then
+	echo 'CONFIG_PACKAGE_iptables-nft-compat=y' >>.config
+fi
 
 # -----------------1. 默认主题切 Argon-----------------
 mkdir -p files/etc/config
@@ -182,11 +233,11 @@ fi
 # -----------------------一线多播----------------------------
 echo 'CONFIG_PACKAGE_kmod-macvlan=y' >> .config    # 同一物理 WAN 口上虚拟出多个 MAC 地址不同的子接口    	≈20 KB
 echo 'CONFIG_PACKAGE_ppp=y' >> .config    # PPP 协议核心程序（原配置已集成）     ≈120 KB
-echo 'CONFIG_PACKAGE_ppp-mod-pppoe=y' >> .config    # PPPoE 内核模块 + 用户态插件（原配置已集成）     ≈30 KB​
+echo 'CONFIG_PACKAGE_ppp-mod-pppoe=y' >> .config    # PPPoE 内核模块 + 用户态插件（原配置已集成）     ≈30 KB
 
 # ---------------------可选：多线负载均衡----------------------
-echo 'CONFIG_PACKAGE_mwan3=y' >> .config     # 多 WAN 负载均衡框架--管理多条出口（wan / wan2 / wan3…）   ≈150 KB​
-echo 'CONFIG_PACKAGE_luci-app-mwan3=y' >> .config    # LuCI Web 管理界面 Web 中可视化配置      ≈80 KB​
+echo 'CONFIG_PACKAGE_mwan3=y' >> .config     # 多 WAN 负载均衡框架--管理多条出口（wan / wan2 / wan3…）   ≈150 KB
+echo 'CONFIG_PACKAGE_luci-app-mwan3=y' >> .config    # LuCI Web 管理界面 Web 中可视化配置      ≈80 KB
       
 
 # -------- Docker --------
@@ -195,13 +246,13 @@ echo 'CONFIG_PACKAGE_luci-app-mwan3=y' >> .config    # LuCI Web 管理界面 Web
 # echo 'CONFIG_PACKAGE_luci-app-dockerman=y' >>.config
 # echo 'CONFIG_PACKAGE_luci-lib-docker=y' >>.config
 
-#if [ $delete_bootstrap ]; then
-#  echo "去除默认bootstrap主题"
-#  sed -i '/\+luci-theme-bootstrap/d' feeds/luci/collections/luci/Makefile
-#  sed -i '/\+luci-theme-bootstrap/d' package/feeds/luci/luci/Makefile
-#  sed -i '/CONFIG_PACKAGE_luci-theme-bootstrap=y/d' .config
-#  sed -i '/set luci.main.mediaurlbase=\/luci-static\/bootstrap/d' feeds/luci/themes/luci-theme-bootstrap/root/etc/uci-defaults/30_luci-theme-bootstrap
-#fi
+# ========== Bootstrap 删除（仅 Lean 有效） ==========
+if [ "$TARGET_TYPE" = "LEAN" ] && [ "$delete_bootstrap" = "true" ]; then
+	echo "去除默认bootstrap主题"
+	sed -i '/\+luci-theme-bootstrap/d' feeds/luci/collections/luci/Makefile 2>/dev/null || true
+	sed -i '/CONFIG_PACKAGE_luci-theme-bootstrap=y/d' .config 2>/dev/null || true
+fi
+# ======================================================
 
 #echo '添加主题argon'
 #(git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon && {
@@ -371,6 +422,3 @@ echo "CONFIG_FIRMWARE_INCLUDE_SMARTDNSBIN=y" >>.config  # smartdns二进制文�
 # sed -i "/CONFIG_FIRMWARE_INCLUDE_SRELAY/d" .config       # 删除配置项 srelay 代理
 # sed -i "/CONFIG_FIRMWARE_INCLUDE_WYY/d" .config          # 删除配置项 网易云解锁
 # sed -i "/CONFIG_FIRMWARE_INCLUDE_WYYBIN/d" .config       # 删除配置项 网易云解锁GO版本执行文件（4M多）注意固件超大小
-
-
-#--------------------------------------------------------------------------------------------------------------
