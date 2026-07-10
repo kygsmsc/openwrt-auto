@@ -36,6 +36,9 @@ utc_name='Asia\/Shanghai'                                                   # �
 delete_bootstrap=true                                                       # 是否删除默认主题 true 、false
 default_theme='argon'                                                       # 默认主题 结合主题文件夹名字
 theme_argon='https://github.com/sypopo/luci-theme-argon-mc.git'             # 主题地址
+# 【修改】以下两个变量已废弃，予以删除
+# theme_argon='https://github.com/sypopo/luci-theme-argon-mc.git'   # 主题地址 不再使用，实际采用 JerryKuku Argon
+# DEFAULT_PATH="./user/shared/defaults.h"                           # WiFi 已改用 uci-defaults 管理
 openClash_url='https://github.com/vernesong/OpenClash.git'                  # OpenClash包地址
 adguardhome_url='https://github.com/rufengsuixing/luci-app-adguardhome.git' # adguardhome 包地址
 lienol_url='https://github.com/Lienol/openwrt-package.git'                  # Lienol 包地址
@@ -44,7 +47,6 @@ vssr_url='https://github.com/jerrykuku/luci-app-vssr.git'                   # vs
 vssr_plus_rely='https://github.com/Leo-Jo-My/my.git'                        # vssr_plus 依赖
 vssr_plus='https://github.com/Leo-Jo-My/luci-app-vssr-plus.git'             # vssr_plus 地址
 filter_url='https://github.com/destan19/OpenAppFilter.git'                  # AppFilter 地址
-DEFAULT_PATH="./user/shared/defaults.h" # 默认文件配置目录
 # 命令
 
 
@@ -154,6 +156,18 @@ config wifi-iface 'default_radio0'
 	option ssid '${WIFI_SSID}'
 	option encryption '${WIFI_ENCRYPTION}'
 	option key '${WIFI_PASSWORD}'
+
+# 【修改】新增 5G WiFi 配置
+# 原因：
+# - 双频设备在刷机后 5G 频段默认无密码或未启用
+# - 此处复用同一变量，仅 SSID 后缀区分
+config wifi-iface 'default_radio1'
+	option device 'radio1'
+	option network 'lan'
+	option mode 'ap'
+	option ssid '${WIFI_SSID}_5G'
+	option encryption '${WIFI_ENCRYPTION}'
+	option key '${WIFI_PASSWORD}'
 EOF
 
 echo "更新版本号时间"
@@ -166,8 +180,8 @@ sed -i "s/192.168.1.1/$lan_ip/g" package/base-files/files/bin/config_generate
 echo "修改时区"
 sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='$utc_name'/g" package/base-files/files/bin/config_generate
 
-#echo "修改默认主题"
-#sed -i "s/bootstrap/$default_theme/g" feeds/luci/modules/luci-base/root/etc/config/luci
+# echo "修改默认主题"
+# sed -i "s/bootstrap/$default_theme/g" feeds/luci/modules/luci-base/root/etc/config/luci
 
 # ===============================================
 # 添加 luci-theme-istore（iStoreOS 蓝白主题）
@@ -254,7 +268,7 @@ echo 'CONFIG_PACKAGE_luci-app-wol=y' >>.config	                  # Wake on LAN�
 
 
 # -----------------主题（iStoreOS 官方紫调 Argon）-----------------------
-echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config             # Argon 主题本体（好看、动画、毛玻璃）
+# echo 'CONFIG_PACKAGE_luci-theme-istore=y' >>.config             # Argon 主题本体（好看、动画、毛玻璃）
 echo 'CONFIG_PACKAGE_luci-app-argon-config=y' >>.config         # Argon 的主题配置工具（Web 页面）
 echo 'CONFIG_LUCI_LANG_zh_Hans=y' >>.config                     # 启用 LuCI 的简体中文语言包
 
@@ -280,10 +294,18 @@ cat > files/etc/config/quickstart <<'EOF'
 config quickstart 'main'
 	option wizard_finished '1'
 EOF
+# 【修改】增强 quickstart Makefile 路径判断
+# 原因：
+# - 不同源码/feeds 环境下路径可能为 package/feeds/nas_luci 或 feeds/nas_luci
+# - 增加容错，防止因路径变化导致脚本失败
 if [ -f "package/feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
     sed -i 's/DEPENDS:=+luci-base/DEPENDS:=+luci-base\nNO_MINIFY=1/' \
         package/feeds/nas_luci/luci-app-quickstart/Makefile
+elif [ -f "feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
+    sed -i 's/DEPENDS:=+luci-base/DEPENDS:=+luci-base\nNO_MINIFY=1/' \
+        feeds/nas_luci/luci-app-quickstart/Makefile
 fi
+
 #-------------------------------------------------------------------------------------
 # -----------------------一线多播----------------------------
 echo 'CONFIG_PACKAGE_kmod-macvlan=y' >> .config    # 同一物理 WAN 口上虚拟出多个 MAC 地址不同的子接口    	≈20 KB
