@@ -114,8 +114,8 @@ grep -q '^src-git nas_luci' feeds.conf.default \
 # 推荐：part1 只改 feeds.conf，install 交给 workflow 的 ./scripts/feeds install -a
 # 但如果 workflow 里没单独 install luci-app-store，就在这里装：
 ./scripts/feeds update istore nas nas_luci
-./scripts/feeds install -a -p nas
-./scripts/feeds install -a -p nas_luci
-./scripts/feeds install -p istore luci-app-store
-./scripts/feeds install -p istore luci-app-quickstart
+# ./scripts/feeds install -a -p nas
+# ./scripts/feeds install -a -p nas_luci
+# ./scripts/feeds install -p istore luci-app-store
+# ./scripts/feeds install -p istore luci-app-quickstart
 echo ">>> [part1] 完成"
