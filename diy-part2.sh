@@ -67,7 +67,7 @@ EOF
 
 chmod +x files/etc/uci-defaults/99-set-user
 
-
+: <<'EOF'
 # 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
 # ========== 自动适配 zzz-default-settings 路径 ==========
 ZZZ_DEFAULT=""
@@ -84,6 +84,50 @@ done
 if [ -n "$ZZZ_DEFAULT" ]; then
 	sed -i 's@.*CYXluq4wUazHjmCDBCqXF*@#&@g' "$ZZZ_DEFAULT"
 	echo ">>> [part2] Patch root password skip: $ZZZ_DEFAULT"
+else
+	echo "⚠️  zzz-default-settings not found, skip root password patch"
+fi
+# ========================================================
+EOF
+
+# 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
+# ========== 自动适配 zzz-default-settings 路径 ==========
+#
+# 【修改】不再直接 patch zzz-default-settings
+# 原因：
+# 1. zzz-default-settings 属于 OpenWrt 的“首次启动状态机”
+# 2. 与 luci-app-quickstart 共用同一生命周期
+# 3. patch 后容易导致：
+#    - 登录成功
+#    - 显示“修改密码提示”
+#    - quickstart 接管首页
+#    - controller 渲染失败 → 无限转圈
+# ------------------------------------------------------------
+# ✅ 改用 uci-defaults 方式设置空密码（安全、无副作用）
+
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/99-root-password <<'EOF'
+#!/bin/sh
+# 仅在首次启动时清空 root 密码
+[ -e /etc/shadow ] && sed -i 's#^root:[^:]*:#root::#' /etc/shadow
+exit 0
+EOF
+chmod +x files/etc/uci-defaults/99-root-password
+
+# 【保留】仅作兼容性检测，不再执行 patch
+ZZZ_DEFAULT=""
+for p in \
+	package/lean/default-settings/files/zzz-default-settings \
+	package/default-settings/files/zzz-default-settings \
+	feeds/luci/modules/luci-base/root/etc/uci-defaults/zzz-default-settings; do
+	if [ -f "$p" ]; then
+		ZZZ_DEFAULT="$p"
+		break
+	fi
+done
+
+if [ -n "$ZZZ_DEFAULT" ]; then
+	echo ">>> [part2] zzz-default-settings found, but NOT patched (safe mode)"
 else
 	echo "⚠️  zzz-default-settings not found, skip root password patch"
 fi
@@ -217,13 +261,13 @@ config luci 'main'
 EOF
 
 # ----------------2. 让"首页"在左侧菜单排第一（ImmortalWrt 下 quickstart controller 权重有时不对）---------------------
-sed -i 's/entry({"admin", "quickstart"/entry({"admin", "quickstart", order = 1}/' package/*/luci-app-quickstart/luasrc/controller/quickstart.lua 2>/dev/null || true
+# sed -i 's/entry({"admin", "quickstart"/entry({"admin", "quickstart", order = 1}/' package/*/luci-app-quickstart/luasrc/controller/quickstart.lua 2>/dev/null || true
 
 # ----------------3. 清掉 wizard_finished 标记，强制 QuickStart 向导首次弹出（可选，看你喜欢不喜欢自动弹）--------------------
 mkdir -p files/etc/config
 cat > files/etc/config/quickstart <<'EOF'
 config quickstart 'main'
-	option wizard_finished '0'
+	option wizard_finished '1'
 EOF
 if [ -f "package/feeds/nas_luci/luci-app-quickstart/Makefile" ]; then
     sed -i 's/DEPENDS:=+luci-base/DEPENDS:=+luci-base\nNO_MINIFY=1/' \
