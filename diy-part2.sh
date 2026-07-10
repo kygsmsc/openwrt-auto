@@ -26,8 +26,9 @@ fi
 
 USER_NAME='admin'        # 用户名 admin
 device_name='G-DOCK'      # 设备名
-wifi_name="OpenWrt"       # Wifi 名字 
+WIFI_SSID="OpenWrt"       # Wifi 名字 
 WIFI_PASSWORD="1234567890"              # wifi密码，切记密码最少8位 admin
+WIFI_ENCRYPTION="psk2"                  # 加密：WPA2-PSK
 VERSION_name='KYGS'                     # 系统版本名称 KYGS
 VERSION_TIME=$(date "+%Y%m%d")          # 自动时间更新时版本号: 20200320
 lan_ip='192.168.2.1'                                                        # Lan Ip地址
@@ -140,11 +141,20 @@ fi
 sed -i "s/OpenWrt/$device_name/g" package/base-files/files/bin/config_generate
 
 
-# echo "修改wifi名称"
-sed -i "s/OpenWrt/$wifi_name/g" package/kernel/mac80211/files/lib/wifi/mac80211.sh
+# echo "修改wifi名称"和"修改Wif密码"
+# sed -i "s/OpenWrt/$wifi_name/g" package/kernel/mac80211/files/lib/wifi/mac80211.sh
+# sed -i "s/1234567890/$WIFI_PASSWORD/g" $DEFAULT_PATH
 
-# echo "修改Wif密码"
-sed -i "s/1234567890/$WIFI_PASSWORD/g" $DEFAULT_PATH
+mkdir -p files/etc/config
+cat > files/etc/config/wireless <<EOF
+config wifi-iface 'default_radio0'
+	option device 'radio0'
+	option network 'lan'
+	option mode 'ap'
+	option ssid '${WIFI_SSID}'
+	option encryption '${WIFI_ENCRYPTION}'
+	option key '${WIFI_PASSWORD}'
+EOF
 
 echo "更新版本号时间"
 [ -f ./versions.inc ] && \
