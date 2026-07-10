@@ -147,7 +147,8 @@ sed -i "s/OpenWrt/$wifi_name/g" package/kernel/mac80211/files/lib/wifi/mac80211.
 sed -i "s/1234567890/$WIFI_PASSWORD/g" $DEFAULT_PATH
 
 echo "更新版本号时间"
-sed -i "s/FIRMWARE_BUILDS_REV=[0-9]*/FIRMWARE_BUILDS_REV="$VERSION_namez$VERSION_TIME"/g" ./versions.inc
+[ -f ./versions.inc ] && \
+sed -i "s/FIRMWARE_BUILDS_REV=[0-9]*/FIRMWARE_BUILDS_REV=${VERSION_name}z${VERSION_TIME}/g" ./versions.inc
 
 echo "设置lan ip"
 sed -i "s/192.168.1.1/$lan_ip/g" package/base-files/files/bin/config_generate
