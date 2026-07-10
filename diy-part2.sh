@@ -70,28 +70,28 @@ EOF
 
 chmod +x files/etc/uci-defaults/99-set-user
 
-: <<'EOF'
+
 # 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
 # ========== 自动适配 zzz-default-settings 路径 ==========
-ZZZ_DEFAULT=""
-for p in \
-	package/lean/default-settings/files/zzz-default-settings \
-	package/default-settings/files/zzz-default-settings \
-	feeds/luci/modules/luci-base/root/etc/uci-defaults/zzz-default-settings; do
-	if [ -f "$p" ]; then
-		ZZZ_DEFAULT="$p"
-		break
-	fi
-done
+# ZZZ_DEFAULT=""
+# for p in \
+# 	package/lean/default-settings/files/zzz-default-settings \
+# 	package/default-settings/files/zzz-default-settings \
+# 	feeds/luci/modules/luci-base/root/etc/uci-defaults/zzz-default-settings; do
+# 	if [ -f "$p" ]; then
+# 		ZZZ_DEFAULT="$p"
+# 		break
+# 	fi
+# done
 
-if [ -n "$ZZZ_DEFAULT" ]; then
-	sed -i 's@.*CYXluq4wUazHjmCDBCqXF*@#&@g' "$ZZZ_DEFAULT"
-	echo ">>> [part2] Patch root password skip: $ZZZ_DEFAULT"
-else
-	echo "⚠️  zzz-default-settings not found, skip root password patch"
-fi
+# if [ -n "$ZZZ_DEFAULT" ]; then
+# 	sed -i 's@.*CYXluq4wUazHjmCDBCqXF*@#&@g' "$ZZZ_DEFAULT"
+# 	echo ">>> [part2] Patch root password skip: $ZZZ_DEFAULT"
+# else
+# 	echo "⚠️  zzz-default-settings not found, skip root password patch"
+# fi
 # ========================================================
-EOF
+
 
 # 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
 # ========== 自动适配 zzz-default-settings 路径 ==========
