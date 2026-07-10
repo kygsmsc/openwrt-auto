@@ -71,7 +71,7 @@ EOF
 chmod +x files/etc/uci-defaults/99-set-user
 
 
-# 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
+# ------------设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）-----------------
 # ========== 自动适配 zzz-default-settings 路径 ==========
 # ZZZ_DEFAULT=""
 # for p in \
@@ -93,7 +93,7 @@ chmod +x files/etc/uci-defaults/99-set-user
 # ========================================================
 
 
-# 设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）
+# ------------设置密码为空（安装固件时无需密码登陆，然后自己修改想要的密码）-----------------
 # ========== 自动适配 zzz-default-settings 路径 ==========
 #
 # 【修改】不再直接 patch zzz-default-settings
@@ -105,7 +105,7 @@ chmod +x files/etc/uci-defaults/99-set-user
 #    - 显示“修改密码提示”
 #    - quickstart 接管首页
 #    - controller 渲染失败 → 无限转圈
-# ------------------------------------------------------------
+# ==========================================================
 # ✅ 改用 uci-defaults 方式设置空密码（安全、无副作用）
 
 mkdir -p files/etc/uci-defaults
@@ -134,7 +134,7 @@ if [ -n "$ZZZ_DEFAULT" ]; then
 else
 	echo "⚠️  zzz-default-settings not found, skip root password patch"
 fi
-# ========================================================
+# -------------------------------------------------------------------------
 
 # 修改想要的root密码
 #sed -i 's/root:$1$V4UetPzk$CYXluq4wUazHjmCDBCqXF.:0:0:99999:7:::/root:你的密码/g' package/lean/default-settings/files/zzz-default-settings
